@@ -93,10 +93,10 @@ const DEFAULT_EXPERT_TRADES = [
     drawdown: 13.4,
     code: "300666",
     stock: "江丰电子",
-    action: "高开验证",
+    action: "冲高验证",
     price: 354.78,
     position: "只做小仓试错",
-    reason: "样例逻辑：前日未涨停但强势收盘，次日只看竞价高开后是否继续放量；不满足高开承接则不跟。",
+    reason: "样例逻辑：前日未涨停但强势收盘，次日只看盘中是否能冲高5%以上并继续放量；冲高无承接则不跟。",
     createdAt: "内置参考样例"
   },
   {
@@ -180,7 +180,7 @@ function highOpenWindowInfo(now = new Date()) {
     ...clock,
     inWindow,
     sampleType: inWindow ? "close30" : "preview",
-    modelVersion: inWindow ? "high-open-close30-v2" : "high-open-preview-v2",
+    modelVersion: inWindow ? "high-rush-close30-v3" : "high-rush-preview-v3",
     label
   };
 }
@@ -428,10 +428,10 @@ function firstBoardTrigger(item) {
   const change = safeNumber(item.changePct);
   const volumeRatio = safeNumber(item.volumeRatio);
   const price = safeNumber(item.price);
-  const targetOpen = price > 0 ? fmt.format(price * 1.05) : "--";
-  if (change >= 6.8) return `前一日未涨停但收盘强势；次日竞价高开≥5%算命中，参考价 ${targetOpen}`;
-  if (change >= 4.8) return `需尾盘资金继续承接，次日竞价高开≥5%；当前量比 ${fmt.format(volumeRatio || 0)}`;
-  return `只做观察，需收盘保持强势并有板块资金配合；高开5%参考价 ${targetOpen}`;
+  const targetHigh = price > 0 ? fmt.format(price * 1.05) : "--";
+  if (change >= 6.8) return `前一日未涨停但收盘强势；次日盘中最高价冲高≥5%算命中，参考价 ${targetHigh}`;
+  if (change >= 4.8) return `需尾盘资金继续承接，次日盘中冲高≥5%；当前量比 ${fmt.format(volumeRatio || 0)}`;
+  return `只做观察，需收盘保持强势并有板块资金配合；冲高5%参考价 ${targetHigh}`;
 }
 
 function firstBoardRisk(item) {
@@ -439,10 +439,19 @@ function firstBoardRisk(item) {
   const volumeRatio = safeNumber(item.volumeRatio);
   const change = safeNumber(item.changePct);
   if (change >= 9.7) return "前一日已涨停，不符合该模型";
-  if (turnover > 22) return "换手偏高，次日高开后回落风险大";
+  if (turnover > 22) return "换手偏高，次日冲高回落风险大";
   if (volumeRatio > 7) return "量比过热，防止尾盘透支次日竞价";
-  if (change < 3) return "强度不足，高开5%概率偏低";
-  return "次日若高开不放量或快速回落，不追高";
+  if (change < 3) return "强度不足，盘中冲高5%概率偏低";
+  return "次日若冲高不放量或快速回落，不追高";
+}
+
+function firstBoardConditionPlan(item) {
+  const price = safeNumber(item.price);
+  const triggerPrice = price > 0 ? price * 1.05 : 0;
+  const accuracy = state.highOpenHistory?.summary?.top5?.rate;
+  const accuracyText = Number.isFinite(Number(accuracy)) ? `历史Top5 ${accuracy}%` : "历史样本不足";
+  const triggerText = triggerPrice > 0 ? fmt.format(triggerPrice) : "--";
+  return `条件单参考：触价 ${triggerText} 视为冲高5%触发；${accuracyText}，样本稳定前建议先设提醒不自动买入。`;
 }
 
 function buildFirstBoardCandidates() {
@@ -505,7 +514,7 @@ function renderHighOpenWindowStatus() {
   const saveButton = $("#saveHighOpenSnapshot");
   if (!box) return highOpenWindowInfo();
   const info = highOpenWindowInfo();
-  box.textContent = `${info.label} 当前北京时间 ${info.hour.toString().padStart(2, "0")}:${info.minute.toString().padStart(2, "0")}，预测目标为下一交易日开盘高开≥5%。`;
+  box.textContent = `${info.label} 当前北京时间 ${info.hour.toString().padStart(2, "0")}:${info.minute.toString().padStart(2, "0")}，预测目标为下一交易日盘中冲高≥5%。`;
   box.classList.toggle("active", info.inWindow);
   box.classList.toggle("waiting", !info.inWindow);
   if (saveButton) {
@@ -1056,7 +1065,7 @@ function renderFirstBoard() {
     const filterText = $("#highOpenFilterStatus")?.textContent || "价格不限";
     table.innerHTML = `
       <tr>
-        <td colspan="5">当前没有达到高开 5% 模型阈值的候选。当前筛选：${filterText}。优先等待未涨停强势股、量能和板块资金形成共振。</td>
+        <td colspan="5">当前没有达到冲高 5% 模型阈值的候选。当前筛选：${filterText}。优先等待未涨停强势股、量能和板块资金形成共振。</td>
       </tr>
     `;
     return;
@@ -1067,7 +1076,7 @@ function renderFirstBoard() {
       <td><b class="${item.firstBoardProbability >= 76 ? "red" : "amber"}">${item.firstBoardProbability}</b></td>
       <td>${item.trigger}</td>
       <td>${factorSummary(item)}<br><span class="sector-meta">股性 ${item.temper} · 板块 ${item.industry || "--"}</span></td>
-      <td class="plan-cell">${item.risk}<br><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 前一天未涨停 次日高开5%以上 主力资金 人气排名`)}">同花顺验证</a></td>
+      <td class="plan-cell">${item.risk}<br><span class="sector-meta">${firstBoardConditionPlan(item)}</span><br><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 前一天未涨停 次日盘中冲高5%以上 主力资金 人气排名`)}">同花顺验证</a></td>
     </tr>
   `).join("");
 }
@@ -1081,25 +1090,26 @@ function renderHighOpenAccuracy(data = state.highOpenHistory) {
   if (cards[1]) cards[1].textContent = `${summary.top10.rate}%`;
   if (cards[2]) cards[2].textContent = summary.pendingDays ? `${summary.settledDays}/${summary.pendingDays}天` : `${summary.settledDays}天`;
   const note = $("#highOpenAccuracyNote");
-  if (note) note.textContent = `${summary.suggestion || "记录预测后，会按次日开盘价自动结算。"} 正式尾盘样本 ${summary.formalDays ?? 0} 天，预览样本 ${summary.previewDays ?? 0} 天。`;
+  if (note) note.textContent = `${summary.suggestion || "记录预测后，会按次日盘中最高价自动结算。"} 正式尾盘样本 ${summary.formalDays ?? 0} 天，预览样本 ${summary.previewDays ?? 0} 天。`;
   const list = $("#highOpenHistoryList");
   if (list) {
     list.innerHTML = snapshots.slice(0, 8).map((item) => {
       const sampleLabel = (item.sampleType || "close30") === "close30" ? "尾盘正式" : "预览";
       const status = item.status === "settled"
         ? `Top5 ${item.top5?.hits || 0}/${item.top5?.total || 0} · Top10 ${item.top10?.hits || 0}/${item.top10?.total || 0}`
-        : `待 ${item.targetDate} 开盘后结算`;
+        : `待 ${item.targetDate} 收盘后结算`;
       const resultByCode = new Map((item.results || []).map((row) => [row.code, row]));
       const rows = (item.predictions || []).slice(0, 5).map((row) => {
         const result = resultByCode.get(row.code);
         const mark = item.status === "settled"
           ? result?.hit ? "命中" : "未中"
           : "待验证";
-        const openText = result?.highOpenPct !== undefined ? ` · 高开 ${pct(result.highOpenPct)}` : "";
+        const rushValue = result?.highRushPct ?? result?.highOpenPct;
+        const openText = rushValue !== undefined ? ` · 冲高 ${pct(rushValue)}` : "";
         return `<span class="history-pick ${result?.hit ? "hit" : ""}">${row.rank}. ${row.name} ${row.code} · ${Math.round(row.probability || 0)}% · ${mark}${openText}</span>`;
       }).join("");
       return `<div class="history-record"><b>${sampleLabel}</b> ${item.date} 预测 ${item.targetDate}：${status}<div class="history-picks">${rows || "无候选明细"}</div></div>`;
-    }).join("") || `<div>暂无高开 5% 预测历史。尾盘 14:30-15:00 会自动记录，也可以点“记录尾盘预测”。</div>`;
+    }).join("") || `<div>暂无冲高 5% 预测历史。尾盘 14:30-15:00 会自动记录，也可以点“记录尾盘预测”。</div>`;
   }
 }
 
@@ -1153,7 +1163,7 @@ async function saveHighOpenSnapshot() {
   const windowInfo = renderHighOpenWindowStatus();
   const rows = buildFirstBoardCandidates();
   if (!rows.length) {
-    alert("当前没有可记录的高开 5% 预测候选。");
+    alert("当前没有可记录的冲高 5% 预测候选。");
     return;
   }
   const data = await api("/api/high-open-history/save", {
@@ -1177,7 +1187,7 @@ async function saveHighOpenSnapshot() {
   writeHighOpenHistoryBackup(state.highOpenHistory);
   await loadHighOpenHistory();
   alert(windowInfo.inWindow
-    ? "已记录正式尾盘高开 5% 预测，后续会按次日开盘表现自动结算准确度并用于优化模型。"
+    ? "已记录正式尾盘冲高 5% 预测，后续会按次日盘中最高价自动结算准确度并用于优化模型。"
     : "已记录预览预测。非 14:30-15:00 尾盘窗口样本会保留复盘，但不作为正式尾盘模型样本。");
 }
 
@@ -1194,7 +1204,7 @@ async function autoSaveHighOpenSnapshotIfNeeded() {
     body: JSON.stringify({
       predictions: rows,
       sampleType: "close30",
-      modelVersion: "high-open-close30-v2",
+      modelVersion: "high-rush-close30-v3",
       predictionWindow: {
         name: "tail-close-30m",
         label: "交易日14:30-15:00",
@@ -1586,7 +1596,7 @@ async function loadAll(options = {}) {
   renderMarketBias();
   renderFirstBoard();
   renderHighOpenAccuracy();
-  autoSaveHighOpenSnapshotIfNeeded().catch((error) => console.warn("尾盘高开预测自动记录失败", error));
+  autoSaveHighOpenSnapshotIfNeeded().catch((error) => console.warn("尾盘冲高预测自动记录失败", error));
   renderPredictions();
   renderPredictionAccuracy();
   renderQuote();

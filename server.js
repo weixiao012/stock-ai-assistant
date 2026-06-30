@@ -235,7 +235,9 @@ function summarizeAccuracy(snapshots = []) {
 }
 
 async function settleHighOpenSnapshot(snapshot) {
-  if (!snapshot?.targetDate || snapshot.status === "settled") return snapshot;
+  if (!snapshot?.targetDate) return snapshot;
+  const hasRushResults = (snapshot.results || []).some((item) => item.highRushPct !== undefined);
+  if (snapshot.status === "settled" && hasRushResults) return snapshot;
   if (snapshot.targetDate > chinaDate()) return snapshot;
   const predictions = snapshot.predictions || [];
   const results = [];
@@ -250,17 +252,19 @@ async function settleHighOpenSnapshot(snapshot) {
       const prev = rows[targetIndex - 1];
       const target = rows[targetIndex];
       const prevWasLimit = Number(prev.changePct || 0) >= 9.7;
-      const highOpenPct = prev.close ? ((target.open - prev.close) / prev.close) * 100 : 0;
-      const hit = !prevWasLimit && highOpenPct >= 5;
+      const highRushPct = prev.close ? ((target.high - prev.close) / prev.close) * 100 : 0;
+      const hit = !prevWasLimit && highRushPct >= 5;
       results.push({
         ...item,
         hit,
-        highOpenPct: Math.round(highOpenPct * 100) / 100,
+        highRushPct: Math.round(highRushPct * 100) / 100,
+        highOpenPct: Math.round(highRushPct * 100) / 100,
         prevDate: prev.date,
         prevChangePct: prev.changePct,
         targetOpen: target.open,
+        targetHigh: target.high,
         prevClose: prev.close,
-        reason: hit ? "前日未涨停且次日高开>=5%" : "未满足高开>=5%或前日已涨停"
+        reason: hit ? "前日未涨停且次日盘中冲高>=5%" : "未满足盘中冲高>=5%或前日已涨停"
       });
     } catch (error) {
       results.push({ ...item, hit: false, reason: error.message || "结算失败" });
@@ -288,10 +292,10 @@ function summarizeHighOpenAccuracy(snapshots = []) {
     formalDays: formalSnapshots.length,
     previewDays: previewCount,
     suggestion: summary.settledDays
-      ? `高开5%历史Top5命中率 ${summary.top5.rate}%，优先跟踪前排且前日未涨停的强势股。`
+      ? `冲高5%历史Top5命中率 ${summary.top5.rate}%，优先跟踪前排且前日未涨停的强势股。`
       : summary.pendingDays
-        ? `已有 ${summary.pendingDays} 个待结算高开样本，等目标交易日开盘后自动更新命中率。`
-        : "暂无已结算高开样本，先连续记录 3-5 个交易日后再评估模型。"
+        ? `已有 ${summary.pendingDays} 个待结算冲高样本，等目标交易日收盘后自动更新命中率。`
+        : "暂无已结算冲高样本，先连续记录 3-5 个交易日后再评估模型。"
   };
 }
 
@@ -1099,7 +1103,7 @@ async function saveHighOpenSnapshot(req) {
   const targetDate = body.targetDate || nextTradeDate(today);
   const predictions = normalizeHighOpenPredictions(body.predictions || []);
   if (!predictions.length) {
-    return { error: "没有可保存的高开预测记录" };
+    return { error: "没有可保存的冲高预测记录" };
   }
   const history = await readHighOpenHistory();
   const sampleType = body.sampleType === "preview" ? "preview" : "close30";
@@ -1110,7 +1114,7 @@ async function saveHighOpenSnapshot(req) {
     status: "pending",
     sampleType,
     predictionWindow: body.predictionWindow || {},
-    modelVersion: body.modelVersion || (sampleType === "close30" ? "high-open-close30-v2" : "high-open-preview-v2"),
+    modelVersion: body.modelVersion || (sampleType === "close30" ? "high-rush-close30-v3" : "high-rush-preview-v3"),
     settings: body.settings || {},
     predictions
   };
