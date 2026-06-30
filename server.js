@@ -270,16 +270,25 @@ async function settleHighOpenSnapshot(snapshot) {
       results.push({ ...item, hit: false, reason: error.message || "结算失败" });
     }
   }
-  const hitCodes = new Set(results.filter((item) => item.hit).map((item) => item.code));
+  const validResults = results.filter((item) => item.highRushPct !== undefined);
+  if (!validResults.length) {
+    return {
+      ...snapshot,
+      status: "pending",
+      settleError: "No valid target-day kline data; keep pending instead of counting failures as misses.",
+      lastTriedSettleAt: new Date().toISOString()
+    };
+  }
+  const hitCodes = new Set(validResults.filter((item) => item.hit).map((item) => item.code));
   return {
     ...snapshot,
     status: "settled",
     settledAt: new Date().toISOString(),
-    top5: accuracyFor(predictions, hitCodes, 5),
-    top10: accuracyFor(predictions, hitCodes, 10),
-    all: accuracyFor(predictions, hitCodes, predictions.length),
+    top5: accuracyFor(validResults, hitCodes, 5),
+    top10: accuracyFor(validResults, hitCodes, 10),
+    all: accuracyFor(validResults, hitCodes, validResults.length),
     results,
-    hits: results.filter((item) => item.hit)
+    hits: validResults.filter((item) => item.hit)
   };
 }
 

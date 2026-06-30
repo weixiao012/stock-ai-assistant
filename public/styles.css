@@ -361,6 +361,38 @@ textarea {
   line-height: 1.5;
 }
 
+.strategy-gate {
+  border-left: 3px solid var(--blue);
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.strategy-gate strong {
+  color: var(--ink);
+}
+
+.strategy-gate.is-wait {
+  border-left-color: var(--muted);
+  background: #f8fafc;
+  color: var(--muted);
+}
+
+.strategy-gate.is-risk {
+  border-left-color: var(--red);
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.strategy-gate.is-ready {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+  color: #166534;
+}
+
 .limit-panel {
   grid-area: limit;
 }

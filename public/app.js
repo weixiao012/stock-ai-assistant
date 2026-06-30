@@ -355,10 +355,10 @@ function futureLimitScore(raw) {
     const turnover = Number(raw.turnover || 0);
     const amount = Number(raw.amount || 0);
     const volumeRatio = Number(raw.volumeRatio || 0);
-    score += change >= 15 ? 18 : change >= 10 ? 14 : change >= 7 ? 10 : change >= 4 ? 5 : 0;
-    score += amount > 5000000000 ? 12 : amount > 1500000000 ? 8 : amount > 500000000 ? 4 : 0;
-    score += turnover >= 4 && turnover <= 15 ? 8 : turnover > 25 ? -8 : 2;
-    score += volumeRatio >= 1.2 && volumeRatio <= 4 ? 6 : volumeRatio > 6 ? -3 : 0;
+    score += change >= 15 ? 12 : change >= 10 ? 10 : change >= 7 ? 8 : change >= 5 ? 4 : -8;
+    score += amount > 5000000000 ? 10 : amount > 1800000000 ? 8 : amount > 900000000 ? 4 : -8;
+    score += turnover >= 4 && turnover <= 14 ? 9 : turnover > 22 ? -12 : turnover > 0 ? 1 : -4;
+    score += volumeRatio >= 1.2 && volumeRatio <= 3.8 ? 7 : volumeRatio > 5 ? -10 : volumeRatio > 0 ? 1 : -4;
   }
   score += sectorHeatBonus(raw.industry || raw.name, raw.code);
   score += Math.round((stockTemperScore(raw) - 55) / 5);
@@ -370,6 +370,7 @@ function futureLimitScore(raw) {
   if (raw.name?.includes("ST")) score -= 50;
   if (raw.brokenCount > 10) score -= 12;
   if (raw.boardCount >= 5) score -= 5;
+  if (Number(raw.turnover || 0) > 24 || Number(raw.volumeRatio || 0) > 6.5) score -= 10;
   return Math.max(0, Math.min(99, Math.round(score)));
 }
 
@@ -385,7 +386,10 @@ function buildPredictions() {
     if (byCode.has(item.code) || item.name?.includes("ST")) return;
     const change = Number(item.changePct || 0);
     const amount = Number(item.amount || 0);
-    if (change < 5 && amount < 800000000) return;
+    const turnover = Number(item.turnover || 0);
+    const volumeRatio = Number(item.volumeRatio || 0);
+    if (change < 5.5 || amount < 1200000000) return;
+    if (turnover > 24 || volumeRatio > 6.5) return;
     byCode.set(item.code, {
       ...item,
       source: change >= 9.7 ? "强势首板" : "强势冲板"
@@ -401,8 +405,9 @@ function buildPredictions() {
     .filter((item) => item.probability >= state.settings.minScore)
     .filter((item) => Number(item.turnover || 0) <= state.settings.maxTurnover)
     .filter((item) => !state.settings.onlyGoodTemper || item.temper >= 66)
+    .filter((item) => item.source === "涨停接力" || item.probability >= Math.max(72, state.settings.minScore))
     .sort((a, b) => b.probability - a.probability)
-    .slice(0, 30);
+    .slice(0, 18);
 }
 
 function firstBoardScore(item) {
@@ -491,8 +496,47 @@ function buildFirstBoardCandidates() {
     });
   });
   const sorted = [...byCode.values()].sort((a, b) => b.firstBoardProbability - a.firstBoardProbability);
-  const strong = sorted.filter((item) => item.firstBoardProbability >= 68);
-  return (strong.length ? strong.slice(0, 8) : sorted.slice(0, 5));
+  const strong = sorted.filter((item) => item.firstBoardProbability >= 74);
+  return (strong.length ? strong.slice(0, 5) : sorted.slice(0, 3));
+}
+
+function tradeGateLevel(summary, topScore) {
+  const settledDays = safeNumber(summary?.settledDays);
+  const top5Rate = safeNumber(summary?.top5?.rate);
+  if (!settledDays) return { className: "is-wait", action: "只记录", reason: "暂无已结算样本" };
+  if (settledDays < 5) return { className: "is-wait", action: "只记录", reason: `已结算 ${settledDays} 天，样本不足` };
+  if (top5Rate < 30) return { className: "is-risk", action: "暂停交易", reason: `Top5命中率 ${top5Rate}% 偏低` };
+  if (top5Rate < 40) return { className: "is-wait", action: "只做提醒", reason: `Top5命中率 ${top5Rate}% 未达执行线` };
+  if (topScore >= 82 && top5Rate >= 45) return { className: "is-ready", action: "可小仓验证", reason: `Top5命中率 ${top5Rate}% 且头部评分够高` };
+  return { className: "is-wait", action: "观察优先", reason: `Top5命中率 ${top5Rate}% 需要更强候选确认` };
+}
+
+function setStrategyGate(selector, gate, message) {
+  const el = $(selector);
+  if (!el) return;
+  el.className = `strategy-gate ${gate.className}`;
+  el.innerHTML = `<strong>${gate.action}</strong>：${message}`;
+}
+
+function renderHighOpenTradeGate(rows = buildFirstBoardCandidates()) {
+  const summary = state.highOpenHistory?.summary;
+  const top = rows[0];
+  const gate = tradeGateLevel(summary, safeNumber(top?.firstBoardProbability));
+  const target = top?.price ? fmt.format(safeNumber(top.price) * 1.05) : "--";
+  const candidateText = top
+    ? `当前头部 ${top.name} ${top.code}，评分 ${top.firstBoardProbability}，冲高5%验证价约 ${target}。`
+    : "当前没有达标候选，宁可空仓等待。";
+  setStrategyGate("#highOpenTradeGate", gate, `${gate.reason}；${candidateText} 低准确率阶段不建议把条件单当自动买入。`);
+}
+
+function renderLimitTradeGate(rows = buildPredictions()) {
+  const summary = state.predictionHistory?.summary;
+  const top = rows[0];
+  const gate = tradeGateLevel(summary, safeNumber(top?.probability));
+  const candidateText = top
+    ? `当前头部 ${top.name} ${top.code}，评分 ${top.probability}，必须结合竞价、封单和板块强度二次确认。`
+    : "当前没有达标候选，宁可空仓等待。";
+  setStrategyGate("#limitTradeGate", gate, `${gate.reason}；${candidateText} 预测分只用于排序，不代表真实涨停概率。`);
 }
 
 function syncHighOpenFilter() {
@@ -1102,6 +1146,7 @@ function renderPredictions() {
       </tr>
     `;
     renderAiPicks(rows);
+    renderLimitTradeGate(rows);
     return;
   }
   $("#predictionTable").innerHTML = rows.map((item) => `
@@ -1115,6 +1160,7 @@ function renderPredictions() {
     </tr>
   `).join("");
   renderAiPicks(rows);
+  renderLimitTradeGate(rows);
 }
 
 function renderFirstBoard() {
@@ -1129,6 +1175,7 @@ function renderFirstBoard() {
         <td colspan="5">当前没有达到冲高 5% 模型阈值的候选。当前筛选：${filterText}。优先等待未涨停强势股、量能和板块资金形成共振。</td>
       </tr>
     `;
+    renderHighOpenTradeGate(rows);
     return;
   }
   table.innerHTML = rows.map((item) => `
@@ -1140,6 +1187,7 @@ function renderFirstBoard() {
       <td class="plan-cell">${item.risk}<span class="rush-condition">${firstBoardConditionPlan(item)}</span><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 前一天未涨停 次日盘中冲高5%以上 主力资金 人气排名`)}">同花顺验证</a></td>
     </tr>
   `).join("");
+  renderHighOpenTradeGate(rows);
 }
 
 function renderHighOpenAccuracy(data = state.highOpenHistory) {
@@ -1177,6 +1225,7 @@ function renderHighOpenAccuracy(data = state.highOpenHistory) {
       return `<div class="history-record"><b>${sampleLabel}</b> ${item.date} 预测 ${item.targetDate}：${status}<div class="history-picks">${rows || "无候选明细"}</div></div>`;
     }).join("") || `<div>暂无冲高 5% 预测历史。尾盘 14:30-15:00 会自动记录，也可以点“记录尾盘预测”。</div>`;
   }
+  renderHighOpenTradeGate();
 }
 
 function readHighOpenHistoryBackup() {
@@ -1215,6 +1264,7 @@ function renderPredictionAccuracy(data = state.predictionHistory) {
       return `<div>${item.date} 预测 ${item.targetDate}：${status}</div>`;
     }).join("");
   }
+  renderLimitTradeGate();
 }
 
 async function loadHighOpenHistory() {
