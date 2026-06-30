@@ -181,7 +181,7 @@ function highOpenWindowInfo(now = new Date()) {
     ...clock,
     inWindow,
     sampleType: inWindow ? "close30" : "preview",
-    modelVersion: inWindow ? "high-rush-close30-v4" : "high-rush-preview-v4",
+    modelVersion: inWindow ? "high-rush-close30-v5" : "high-rush-preview-v5",
     label
   };
 }
@@ -410,24 +410,43 @@ function buildPredictions() {
     .slice(0, 18);
 }
 
+function highRushRejectReason(item) {
+  const change = safeNumber(item.changePct);
+  const turnover = safeNumber(item.turnover);
+  const volumeRatio = safeNumber(item.volumeRatio);
+  const amount = safeNumber(item.amount);
+  const temper = stockTemperScore(item);
+  if (item.name?.includes("ST")) return "ST或风险警示";
+  if (change >= 8.4) return "前日涨幅过高，次日容易透支";
+  if (change < 4.6) return "前日强度不足";
+  if (turnover > 14.5) return "换手过高，次日抛压大";
+  if (turnover > 0 && turnover < 2.5) return "换手不足，资金活跃度不够";
+  if (volumeRatio > 3.8) return "量比过热，尾盘透支";
+  if (volumeRatio > 0 && volumeRatio < 1) return "量比偏弱，承接不足";
+  if (amount < 1500000000) return "成交额不足，冲高持续性弱";
+  if (temper < 66) return "股性分不足";
+  return "";
+}
+
 function firstBoardScore(item) {
   const change = safeNumber(item.changePct);
   const turnover = safeNumber(item.turnover);
   const volumeRatio = safeNumber(item.volumeRatio);
   const amount = safeNumber(item.amount);
-  let score = 24;
-  score += change >= 5.2 && change <= 8.4 ? 24 : change > 8.4 && change < 9.4 ? 10 : change >= 3.8 ? 12 : -18;
-  score += amount >= 3000000000 ? 15 : amount >= 1200000000 ? 11 : amount >= 800000000 ? 7 : -10;
-  score += turnover >= 3 && turnover <= 14 ? 14 : turnover > 18 ? -16 : turnover >= 1.5 ? 5 : -6;
-  score += volumeRatio >= 1.2 && volumeRatio <= 3.8 ? 12 : volumeRatio > 5.2 ? -14 : volumeRatio > 0 ? 3 : -4;
+  const amplitude = safeNumber(item.amplitude);
+  const temper = stockTemperScore(item);
+  let score = 18;
+  score += change >= 5 && change <= 7.2 ? 32 : change > 7.2 && change < 8.4 ? 10 : change >= 4.6 ? 14 : -34;
+  score += amount >= 1800000000 && amount <= 12000000000 ? 16 : amount > 12000000000 && amount <= 26000000000 ? 7 : amount >= 1500000000 ? 5 : -22;
+  score += turnover >= 3.5 && turnover <= 10 ? 19 : turnover > 10 && turnover <= 13.5 ? 7 : turnover > 14.5 ? -28 : turnover >= 2.5 ? 5 : -18;
+  score += volumeRatio >= 1.15 && volumeRatio <= 2.6 ? 19 : volumeRatio > 2.6 && volumeRatio <= 3.5 ? 7 : volumeRatio > 3.8 ? -28 : volumeRatio >= 1 ? 4 : -16;
+  score += amplitude >= 4 && amplitude <= 11 ? 6 : amplitude > 14 ? -10 : 0;
   score += sectorHeatBonus(item.industry || item.name, item.code);
   score += fundFlowBonus(item);
   score += marketBiasBonus(item);
-  score += Math.round((stockTemperScore(item) - 62) / 4);
-  if (item.name?.includes("ST")) score -= 60;
-  if (change >= 9.7) score -= 60;
-  if (change < 3.8) score -= 18;
-  if (turnover > 22 || volumeRatio > 7) score -= 12;
+  score += Math.round((temper - 64) / 3);
+  const rejectReason = highRushRejectReason(item);
+  if (rejectReason) score -= 35;
   return Math.max(0, Math.min(99, Math.round(score)));
 }
 
@@ -436,19 +455,20 @@ function firstBoardTrigger(item) {
   const volumeRatio = safeNumber(item.volumeRatio);
   const price = safeNumber(item.price);
   const targetHigh = price > 0 ? fmt.format(price * 1.05) : "--";
-  if (change >= 5.2 && change <= 8.4) return `尾盘强势但未涨停；次日盘中最高价冲高≥5%算命中，参考价 ${targetHigh}`;
-  if (change > 8.4) return `涨幅偏高，需竞价不透支且分时承接；当前量比 ${fmt.format(volumeRatio || 0)}`;
-  return `低置信观察，必须有板块资金和尾盘承接共振；冲高5%参考价 ${targetHigh}`;
+  if (change >= 5 && change <= 7.2) return `强度适中未透支；次日盘中最高价冲高≥5%算命中，参考价 ${targetHigh}`;
+  if (change > 7.2) return `涨幅偏高，必须竞价不透支且分时承接；当前量比 ${fmt.format(volumeRatio || 0)}`;
+  return `低置信观察，必须板块资金、尾盘承接和竞价共同确认；冲高5%参考价 ${targetHigh}`;
 }
 
 function firstBoardRisk(item) {
   const turnover = safeNumber(item.turnover);
   const volumeRatio = safeNumber(item.volumeRatio);
   const change = safeNumber(item.changePct);
-  if (change >= 9.7) return "前一日已涨停，不符合该模型";
-  if (turnover > 18) return "换手偏高，次日冲高回落风险大";
-  if (volumeRatio > 5.2) return "量比过热，防止尾盘透支次日竞价";
-  if (change < 3.8) return "强度不足，暂不纳入正式高置信候选";
+  const rejectReason = highRushRejectReason(item);
+  if (rejectReason) return `${rejectReason}，降级或剔除`;
+  if (change > 7.2) return "涨幅偏高，只能看竞价承接，不能追高";
+  if (turnover > 13.5) return "换手略高，必须缩量承接才有效";
+  if (volumeRatio > 3.5) return "量比略热，防止尾盘透支次日弹性";
   return "只把触价当作验证信号；若无放量承接，不追高";
 }
 
@@ -459,13 +479,13 @@ function firstBoardConditionPlan(item) {
   const settledDays = state.highOpenHistory?.summary?.settledDays || 0;
   const accuracyText = Number.isFinite(Number(accuracy)) && settledDays >= 3 ? `历史Top5 ${accuracy}%` : `样本不足(${settledDays}天)`;
   const triggerText = triggerPrice > 0 ? fmt.format(triggerPrice) : "--";
-  return `条件单参考：触价 ${triggerText} 仅视为冲高5%验证；模型评分不是胜率，${accuracyText}，稳定前只建议设提醒。`;
+  return `提醒价 ${triggerText} 仅用于验证冲高5%；模型未稳定前不建议自动买入，${accuracyText}，优先看竞价承接和板块前排。`;
 }
 
 function firstBoardConfidenceLabel(score) {
-  if (score >= 80) return "高置信";
-  if (score >= 68) return "中置信";
-  return "观察";
+  if (score >= 86) return "高置信";
+  if (score >= 78) return "中置信";
+  return "仅记录";
 }
 
 function buildFirstBoardCandidates() {
@@ -479,25 +499,30 @@ function buildFirstBoardCandidates() {
     const turnover = safeNumber(item.turnover);
     const volumeRatio = safeNumber(item.volumeRatio);
     const temper = stockTemperScore(item);
-    if (item.name?.includes("ST")) return;
-    if (change < 3.8 || change >= 9.7 || amount < 800000000) return;
-    if (turnover > 22 || volumeRatio > 7) return;
-    if (temper < 58) return;
+    if (highRushRejectReason(item)) return;
     if (minPrice && price < minPrice) return;
     if (maxPrice && price > maxPrice) return;
     const score = firstBoardScore(item);
+    if (score < 78) return;
     byCode.set(item.code, {
       ...item,
-      source: score >= 76 ? "高置信尾盘候选" : score >= 68 ? "中置信观察" : "低置信观察",
+      source: score >= 86 ? "高置信尾盘候选" : "中置信观察",
       firstBoardProbability: score,
       trigger: firstBoardTrigger(item),
       risk: firstBoardRisk(item),
       temper
     });
   });
+  const sectorUsed = new Map();
   const sorted = [...byCode.values()].sort((a, b) => b.firstBoardProbability - a.firstBoardProbability);
-  const strong = sorted.filter((item) => item.firstBoardProbability >= 74);
-  return (strong.length ? strong.slice(0, 5) : sorted.slice(0, 3));
+  const diversified = sorted.filter((item) => {
+    const key = item.industry || "其他";
+    const count = sectorUsed.get(key) || 0;
+    if (count >= 2) return false;
+    sectorUsed.set(key, count + 1);
+    return true;
+  });
+  return diversified.slice(0, 3);
 }
 
 function tradeGateLevel(summary, topScore) {
@@ -1320,7 +1345,7 @@ async function autoSaveHighOpenSnapshotIfNeeded() {
     body: JSON.stringify({
       predictions: rows,
       sampleType: "close30",
-      modelVersion: "high-rush-close30-v4",
+      modelVersion: windowInfo.modelVersion,
       predictionWindow: {
         name: "tail-close-30m",
         label: "交易日14:30-15:00",

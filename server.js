@@ -1123,7 +1123,7 @@ async function saveHighOpenSnapshot(req) {
     status: "pending",
     sampleType,
     predictionWindow: body.predictionWindow || {},
-    modelVersion: body.modelVersion || (sampleType === "close30" ? "high-rush-close30-v4" : "high-rush-preview-v4"),
+    modelVersion: body.modelVersion || (sampleType === "close30" ? "high-rush-close30-v5" : "high-rush-preview-v5"),
     settings: body.settings || {},
     predictions
   };
