@@ -27,6 +27,7 @@ const state = {
   fundFlowType: "sector",
   sectorType: "industry",
   sectorPanelCollapsed: localStorage.getItem("stock-sector-panel-collapsed") === "1",
+  stockWorkspaceCollapsed: localStorage.getItem("stock-workspace-collapsed") === "1",
   collapsedPanels: JSON.parse(localStorage.getItem("stock-collapsible-panels") || "{}"),
   marketBias: JSON.parse(localStorage.getItem("stock-market-bias") || '{"text":"","themes":[],"tone":0}'),
   highOpenFilter: JSON.parse(localStorage.getItem("stock-high-open-filter") || '{"minPrice":"","maxPrice":""}'),
@@ -180,7 +181,7 @@ function highOpenWindowInfo(now = new Date()) {
     ...clock,
     inWindow,
     sampleType: inWindow ? "close30" : "preview",
-    modelVersion: inWindow ? "high-rush-close30-v3" : "high-rush-preview-v3",
+    modelVersion: inWindow ? "high-rush-close30-v4" : "high-rush-preview-v4",
     label
   };
 }
@@ -409,18 +410,19 @@ function firstBoardScore(item) {
   const turnover = safeNumber(item.turnover);
   const volumeRatio = safeNumber(item.volumeRatio);
   const amount = safeNumber(item.amount);
-  let score = 30;
-  score += change >= 6.8 && change < 9.5 ? 23 : change >= 4.8 ? 17 : change >= 3 ? 9 : -14;
-  score += amount >= 2500000000 ? 15 : amount >= 1000000000 ? 11 : amount >= 500000000 ? 6 : -8;
-  score += turnover >= 2 && turnover <= 16 ? 12 : turnover > 24 ? -12 : turnover > 0 ? 4 : 0;
-  score += volumeRatio >= 1.3 && volumeRatio <= 5.2 ? 11 : volumeRatio > 7 ? -9 : volumeRatio > 0 ? 3 : 0;
+  let score = 24;
+  score += change >= 5.2 && change <= 8.4 ? 24 : change > 8.4 && change < 9.4 ? 10 : change >= 3.8 ? 12 : -18;
+  score += amount >= 3000000000 ? 15 : amount >= 1200000000 ? 11 : amount >= 800000000 ? 7 : -10;
+  score += turnover >= 3 && turnover <= 14 ? 14 : turnover > 18 ? -16 : turnover >= 1.5 ? 5 : -6;
+  score += volumeRatio >= 1.2 && volumeRatio <= 3.8 ? 12 : volumeRatio > 5.2 ? -14 : volumeRatio > 0 ? 3 : -4;
   score += sectorHeatBonus(item.industry || item.name, item.code);
   score += fundFlowBonus(item);
   score += marketBiasBonus(item);
-  score += Math.round((stockTemperScore(item) - 55) / 4);
+  score += Math.round((stockTemperScore(item) - 62) / 4);
   if (item.name?.includes("ST")) score -= 60;
   if (change >= 9.7) score -= 60;
-  if (change < 2.5) score -= 18;
+  if (change < 3.8) score -= 18;
+  if (turnover > 22 || volumeRatio > 7) score -= 12;
   return Math.max(0, Math.min(99, Math.round(score)));
 }
 
@@ -429,9 +431,9 @@ function firstBoardTrigger(item) {
   const volumeRatio = safeNumber(item.volumeRatio);
   const price = safeNumber(item.price);
   const targetHigh = price > 0 ? fmt.format(price * 1.05) : "--";
-  if (change >= 6.8) return `前一日未涨停但收盘强势；次日盘中最高价冲高≥5%算命中，参考价 ${targetHigh}`;
-  if (change >= 4.8) return `需尾盘资金继续承接，次日盘中冲高≥5%；当前量比 ${fmt.format(volumeRatio || 0)}`;
-  return `只做观察，需收盘保持强势并有板块资金配合；冲高5%参考价 ${targetHigh}`;
+  if (change >= 5.2 && change <= 8.4) return `尾盘强势但未涨停；次日盘中最高价冲高≥5%算命中，参考价 ${targetHigh}`;
+  if (change > 8.4) return `涨幅偏高，需竞价不透支且分时承接；当前量比 ${fmt.format(volumeRatio || 0)}`;
+  return `低置信观察，必须有板块资金和尾盘承接共振；冲高5%参考价 ${targetHigh}`;
 }
 
 function firstBoardRisk(item) {
@@ -439,19 +441,26 @@ function firstBoardRisk(item) {
   const volumeRatio = safeNumber(item.volumeRatio);
   const change = safeNumber(item.changePct);
   if (change >= 9.7) return "前一日已涨停，不符合该模型";
-  if (turnover > 22) return "换手偏高，次日冲高回落风险大";
-  if (volumeRatio > 7) return "量比过热，防止尾盘透支次日竞价";
-  if (change < 3) return "强度不足，盘中冲高5%概率偏低";
-  return "次日若冲高不放量或快速回落，不追高";
+  if (turnover > 18) return "换手偏高，次日冲高回落风险大";
+  if (volumeRatio > 5.2) return "量比过热，防止尾盘透支次日竞价";
+  if (change < 3.8) return "强度不足，暂不纳入正式高置信候选";
+  return "只把触价当作验证信号；若无放量承接，不追高";
 }
 
 function firstBoardConditionPlan(item) {
   const price = safeNumber(item.price);
   const triggerPrice = price > 0 ? price * 1.05 : 0;
   const accuracy = state.highOpenHistory?.summary?.top5?.rate;
-  const accuracyText = Number.isFinite(Number(accuracy)) ? `历史Top5 ${accuracy}%` : "历史样本不足";
+  const settledDays = state.highOpenHistory?.summary?.settledDays || 0;
+  const accuracyText = Number.isFinite(Number(accuracy)) && settledDays >= 3 ? `历史Top5 ${accuracy}%` : `样本不足(${settledDays}天)`;
   const triggerText = triggerPrice > 0 ? fmt.format(triggerPrice) : "--";
-  return `条件单参考：触价 ${triggerText} 视为冲高5%触发；${accuracyText}，样本稳定前建议先设提醒不自动买入。`;
+  return `条件单参考：触价 ${triggerText} 仅视为冲高5%验证；模型评分不是胜率，${accuracyText}，稳定前只建议设提醒。`;
+}
+
+function firstBoardConfidenceLabel(score) {
+  if (score >= 80) return "高置信";
+  if (score >= 68) return "中置信";
+  return "观察";
 }
 
 function buildFirstBoardCandidates() {
@@ -462,23 +471,28 @@ function buildFirstBoardCandidates() {
     const change = safeNumber(item.changePct);
     const amount = safeNumber(item.amount);
     const price = safeNumber(item.price);
+    const turnover = safeNumber(item.turnover);
+    const volumeRatio = safeNumber(item.volumeRatio);
+    const temper = stockTemperScore(item);
     if (item.name?.includes("ST")) return;
-    if (change < 2.5 || change >= 9.7 || amount < 300000000) return;
+    if (change < 3.8 || change >= 9.7 || amount < 800000000) return;
+    if (turnover > 22 || volumeRatio > 7) return;
+    if (temper < 58) return;
     if (minPrice && price < minPrice) return;
     if (maxPrice && price > maxPrice) return;
-    const probability = firstBoardScore(item);
+    const score = firstBoardScore(item);
     byCode.set(item.code, {
       ...item,
-      source: probability >= 58 ? "未涨停强势股" : "低置信观察",
-      firstBoardProbability: probability,
+      source: score >= 76 ? "高置信尾盘候选" : score >= 68 ? "中置信观察" : "低置信观察",
+      firstBoardProbability: score,
       trigger: firstBoardTrigger(item),
       risk: firstBoardRisk(item),
-      temper: stockTemperScore(item)
+      temper
     });
   });
   const sorted = [...byCode.values()].sort((a, b) => b.firstBoardProbability - a.firstBoardProbability);
-  const strong = sorted.filter((item) => item.firstBoardProbability >= 58);
-  return (strong.length ? strong.slice(0, 15) : sorted.slice(0, 10));
+  const strong = sorted.filter((item) => item.firstBoardProbability >= 68);
+  return (strong.length ? strong.slice(0, 8) : sorted.slice(0, 5));
 }
 
 function syncHighOpenFilter() {
@@ -767,6 +781,25 @@ function renderSectorPanelState() {
   button.textContent = state.sectorPanelCollapsed ? "展开" : "收起";
 }
 
+function renderStockWorkspaceState() {
+  const shell = $("#appShell");
+  if (!shell) return;
+  shell.classList.toggle("stock-workspace-collapsed", state.stockWorkspaceCollapsed);
+  const text = state.stockWorkspaceCollapsed ? "打开个股/K线" : "收起个股/K线";
+  const topButton = $("#toggleStockWorkspace");
+  const closeButton = $("#closeStockWorkspace");
+  const railButton = $("#openStockWorkspaceRail");
+  if (topButton) topButton.textContent = text;
+  if (closeButton) closeButton.textContent = "收起";
+  if (railButton) railButton.textContent = state.selected ? `${state.selected.name || state.selected.code} / K线` : "个股/K线";
+}
+
+function setStockWorkspaceCollapsed(collapsed) {
+  state.stockWorkspaceCollapsed = collapsed;
+  localStorage.setItem("stock-workspace-collapsed", collapsed ? "1" : "0");
+  renderStockWorkspaceState();
+}
+
 function panelCollapseKey(panel, index) {
   if (panel.id) return panel.id;
   const title = panel.querySelector(".panel-head h2, .panel-head h3")?.textContent.trim();
@@ -791,7 +824,6 @@ function renderCollapsiblePanels() {
       button.setAttribute("aria-expanded", collapsed ? "false" : "true");
     }
   });
-  renderPredictionNotes();
 }
 
 function initCollapsiblePanels() {
@@ -1003,6 +1035,34 @@ function toggleFlowFullscreen() {
   else document.exitFullscreen?.();
 }
 
+function syncHistoryZoomButtons() {
+  document.querySelectorAll("[data-history-zoom]").forEach((button) => {
+    const box = document.getElementById(button.dataset.historyZoom);
+    const zoomed = document.fullscreenElement === box || box?.classList.contains("is-zoomed");
+    button.textContent = zoomed ? "退出放大" : "放大";
+  });
+}
+
+function toggleHistoryZoom(targetId) {
+  const box = document.getElementById(targetId);
+  if (!box) return;
+  if (document.fullscreenElement === box || box.classList.contains("is-zoomed")) {
+    if (document.fullscreenElement === box) document.exitFullscreen?.();
+    box.classList.remove("is-zoomed");
+    syncHistoryZoomButtons();
+    return;
+  }
+  if (box.requestFullscreen) {
+    box.requestFullscreen().catch(() => {
+      box.classList.add("is-zoomed");
+      syncHistoryZoomButtons();
+    });
+  } else {
+    box.classList.add("is-zoomed");
+    syncHistoryZoomButtons();
+  }
+}
+
 async function refreshRealtimeData({ silent = false } = {}) {
   if (isRefreshing) return;
   isRefreshing = true;
@@ -1042,7 +1102,6 @@ function renderPredictions() {
       </tr>
     `;
     renderAiPicks(rows);
-    renderPredictionNotes();
     return;
   }
   $("#predictionTable").innerHTML = rows.map((item) => `
@@ -1056,7 +1115,6 @@ function renderPredictions() {
     </tr>
   `).join("");
   renderAiPicks(rows);
-  renderPredictionNotes();
 }
 
 function renderFirstBoard() {
@@ -1071,93 +1129,16 @@ function renderFirstBoard() {
         <td colspan="5">当前没有达到冲高 5% 模型阈值的候选。当前筛选：${filterText}。优先等待未涨停强势股、量能和板块资金形成共振。</td>
       </tr>
     `;
-    renderPredictionNotes();
     return;
   }
   table.innerHTML = rows.map((item) => `
     <tr data-code="${item.code}">
       <td><button class="stock-link" type="button" data-code="${item.code}">${item.name}</button><br><span>${item.code}</span></td>
-      <td><b class="${item.firstBoardProbability >= 76 ? "red" : "amber"}">${item.firstBoardProbability}</b></td>
+      <td><b class="${item.firstBoardProbability >= 80 ? "red" : "amber"}">${item.firstBoardProbability}</b><br><span class="sector-meta">${firstBoardConfidenceLabel(item.firstBoardProbability)}</span></td>
       <td>${item.trigger}</td>
       <td>${factorSummary(item)}<br><span class="sector-meta">股性 ${item.temper} · 板块 ${item.industry || "--"}</span></td>
       <td class="plan-cell">${item.risk}<span class="rush-condition">${firstBoardConditionPlan(item)}</span><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 前一天未涨停 次日盘中冲高5%以上 主力资金 人气排名`)}">同花顺验证</a></td>
     </tr>
-  `).join("");
-  renderPredictionNotes();
-}
-
-function predictionPanelCollapsed(panelId) {
-  const panel = $(panelId);
-  if (!panel) return false;
-  const key = panel.dataset.collapseKey || panelCollapseKey(panel, 0);
-  return Boolean(state.collapsedPanels[key]);
-}
-
-function predictionSampleText(data) {
-  const summary = data?.summary;
-  if (!summary) return "样本 --";
-  if (summary.pendingDays) return `样本 ${summary.settledDays || 0}/${summary.pendingDays}天`;
-  return `样本 ${summary.settledDays || 0}天`;
-}
-
-function predictionRateText(data, field = "top5") {
-  const rate = data?.summary?.[field]?.rate;
-  return Number.isFinite(Number(rate)) ? `${rate}%` : "--";
-}
-
-function renderPredictionNotes() {
-  const box = $("#predictionNotes");
-  if (!box) return;
-  const rushRows = buildFirstBoardCandidates();
-  const limitRows = buildPredictions();
-  const rushTop = rushRows[0];
-  const limitTop = limitRows[0];
-  const rushCollapsed = predictionPanelCollapsed("#firstBoardPanel");
-  const limitCollapsed = predictionPanelCollapsed("#limitPredictionPanel");
-  const cards = [
-    {
-      id: "firstBoardPanel",
-      title: "冲高5%预测",
-      sub: rushTop ? `${rushTop.name} ${rushTop.code}` : "暂无候选",
-      score: rushTop ? `${rushTop.firstBoardProbability}%` : "--",
-      scoreLabel: "冲高概率",
-      rate: predictionRateText(state.highOpenHistory),
-      sample: predictionSampleText(state.highOpenHistory),
-      foot: "尾盘30分钟样本，次日盘中最高价验证",
-      collapsed: rushCollapsed
-    },
-    {
-      id: "limitPredictionPanel",
-      title: "明日涨停预测",
-      sub: limitTop ? `${limitTop.name} ${limitTop.code}` : "暂无候选",
-      score: limitTop ? `${limitTop.probability}%` : "--",
-      scoreLabel: "预测概率",
-      rate: predictionRateText(state.predictionHistory),
-      sample: predictionSampleText(state.predictionHistory),
-      foot: "按次日实际涨停池结算准确率",
-      collapsed: limitCollapsed
-    }
-  ];
-
-  box.innerHTML = cards.map((item) => `
-    <div class="prediction-note-card">
-      <div class="prediction-note-top">
-        <div class="prediction-note-title">
-          <strong>${item.title}</strong>
-          <span>${item.sub}</span>
-        </div>
-        <span class="prediction-note-badge ${Number.parseFloat(item.score) >= 75 ? "hot" : ""}">${item.scoreLabel} ${item.score}</span>
-      </div>
-      <div class="prediction-note-meta">
-        <span>Top5命中 <b>${item.rate}</b></span>
-        <span>${item.sample}</span>
-        <span>${item.collapsed ? "已收纳" : "已展开"}</span>
-      </div>
-      <div class="prediction-note-actions">
-        <span class="prediction-note-foot">${item.foot}</span>
-        <button class="ghost-button" type="button" data-prediction-target="${item.id}">${item.collapsed ? "展开明细" : "收起明细"}</button>
-      </div>
-    </div>
   `).join("");
 }
 
@@ -1170,7 +1151,12 @@ function renderHighOpenAccuracy(data = state.highOpenHistory) {
   if (cards[1]) cards[1].textContent = `${summary.top10.rate}%`;
   if (cards[2]) cards[2].textContent = summary.pendingDays ? `${summary.settledDays}/${summary.pendingDays}天` : `${summary.settledDays}天`;
   const note = $("#highOpenAccuracyNote");
-  if (note) note.textContent = `${summary.suggestion || "记录预测后，会按次日盘中最高价自动结算。"} 正式尾盘样本 ${summary.formalDays ?? 0} 天，预览样本 ${summary.previewDays ?? 0} 天。`;
+  if (note) {
+    const sampleNote = (summary.settledDays || 0) >= 5
+      ? `历史Top5命中率 ${summary.top5.rate}%，可用于调权。`
+      : `已结算样本 ${summary.settledDays || 0} 天，暂不足以代表真实胜率。`;
+    note.textContent = `${sampleNote} 正式尾盘样本 ${summary.formalDays ?? 0} 天，预览样本 ${summary.previewDays ?? 0} 天；模型评分只用于排序，不等于买入胜率。`;
+  }
   const list = $("#highOpenHistoryList");
   if (list) {
     list.innerHTML = snapshots.slice(0, 8).map((item) => {
@@ -1191,7 +1177,6 @@ function renderHighOpenAccuracy(data = state.highOpenHistory) {
       return `<div class="history-record"><b>${sampleLabel}</b> ${item.date} 预测 ${item.targetDate}：${status}<div class="history-picks">${rows || "无候选明细"}</div></div>`;
     }).join("") || `<div>暂无冲高 5% 预测历史。尾盘 14:30-15:00 会自动记录，也可以点“记录尾盘预测”。</div>`;
   }
-  renderPredictionNotes();
 }
 
 function readHighOpenHistoryBackup() {
@@ -1230,7 +1215,6 @@ function renderPredictionAccuracy(data = state.predictionHistory) {
       return `<div>${item.date} 预测 ${item.targetDate}：${status}</div>`;
     }).join("");
   }
-  renderPredictionNotes();
 }
 
 async function loadHighOpenHistory() {
@@ -1286,7 +1270,7 @@ async function autoSaveHighOpenSnapshotIfNeeded() {
     body: JSON.stringify({
       predictions: rows,
       sampleType: "close30",
-      modelVersion: "high-rush-close30-v3",
+      modelVersion: "high-rush-close30-v4",
       predictionWindow: {
         name: "tail-close-30m",
         label: "交易日14:30-15:00",
@@ -1690,6 +1674,7 @@ async function refreshSelectedStock({ refreshKline = false } = {}) {
   if (!code || code.length !== 6) return;
   state.selected = await safeApi(`/api/quote?code=${code}`, state.selected);
   renderQuote();
+  renderStockWorkspaceState();
   const now = Date.now();
   if (refreshKline || now - lastKlineRefreshAt >= KLINE_REFRESH_MS) {
     lastKlineRefreshAt = now;
@@ -1708,6 +1693,7 @@ async function analyze(code) {
   $("#stockInput").value = clean;
   state.selected = await api(`/api/quote?code=${clean}`);
   renderQuote();
+  renderStockWorkspaceState();
   renderTradingAgents(null);
   lastKlineRefreshAt = Date.now();
   loadKline(clean).catch((error) => {
@@ -1727,6 +1713,9 @@ $("#searchForm").addEventListener("submit", (event) => {
 });
 
 $("#refreshAll").addEventListener("click", () => refreshRealtimeData().catch((error) => alert(error.message)));
+$("#toggleStockWorkspace")?.addEventListener("click", () => setStockWorkspaceCollapsed(!state.stockWorkspaceCollapsed));
+$("#closeStockWorkspace")?.addEventListener("click", () => setStockWorkspaceCollapsed(true));
+$("#openStockWorkspaceRail")?.addEventListener("click", () => setStockWorkspaceCollapsed(false));
 $("#reloadFirstBoard").addEventListener("click", () => refreshRealtimeData().catch((error) => alert(error.message)));
 $("#saveHighOpenSnapshot").addEventListener("click", () => saveHighOpenSnapshot().catch((error) => alert(error.message)));
 $("#refreshHighOpenHistory").addEventListener("click", () => loadHighOpenHistory().catch((error) => alert(error.message)));
@@ -1738,26 +1727,23 @@ $("#resetHighOpenFilter")?.addEventListener("click", () => {
   syncHighOpenFilter();
   renderFirstBoard();
 });
-$("#predictionNotes")?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-prediction-target]");
-  if (!button) return;
-  const panel = document.getElementById(button.dataset.predictionTarget);
-  if (!panel) return;
-  const key = panel.dataset.collapseKey || panelCollapseKey(panel, 0);
-  const nextCollapsed = !state.collapsedPanels[key];
-  state.collapsedPanels[key] = nextCollapsed;
-  saveCollapsedPanels();
-  renderCollapsiblePanels();
-  if (!nextCollapsed) panel.scrollIntoView({ behavior: "smooth", block: "start" });
-});
 $("#savePredictionSnapshot").addEventListener("click", () => savePredictionSnapshot().catch((error) => alert(error.message)));
 $("#refreshPredictionHistory").addEventListener("click", () => loadPredictionHistory().catch((error) => alert(error.message)));
 $("#toggleFlowFullscreen").addEventListener("click", toggleFlowFullscreen);
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-history-zoom]");
+  if (!button) return;
+  toggleHistoryZoom(button.dataset.historyZoom);
+});
 $("#sectorFlowCanvas").addEventListener("mousemove", showSectorFlowTooltip);
 $("#sectorFlowCanvas").addEventListener("mouseleave", hideSectorFlowTooltip);
 window.addEventListener("resize", renderSectorFlowChart);
 document.addEventListener("fullscreenchange", () => {
   $("#toggleFlowFullscreen").textContent = document.fullscreenElement ? "退出全屏" : "全屏";
+  document.querySelectorAll(".prediction-history-box.is-zoomed").forEach((box) => {
+    if (document.fullscreenElement !== box) box.classList.remove("is-zoomed");
+  });
+  syncHistoryZoomButtons();
   setTimeout(renderSectorFlowChart, 80);
 });
 $("#runTradingAgents").addEventListener("click", () => runTradingAgents().catch((error) => {
@@ -1960,6 +1946,7 @@ syncSettingsForm();
 syncHighOpenFilter();
 initCollapsiblePanels();
 renderSectorPanelState();
+renderStockWorkspaceState();
 startRealtimeSync();
 loadHighOpenHistory().catch(() => renderHighOpenAccuracy());
 loadPredictionHistory().catch(() => renderPredictionAccuracy());

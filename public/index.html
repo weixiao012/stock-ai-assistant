@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
-    <div class="app-shell">
+    <div id="appShell" class="app-shell">
       <aside class="sidebar">
         <div class="brand">
           <div class="brand-mark">AI</div>
@@ -15,6 +15,7 @@
             <h1>A股智能分析助手</h1>
             <p>涨停预测 · 操作计划 · 同花顺参考</p>
           </div>
+          <button id="closeStockWorkspace" class="ghost-button sidebar-fold-button" type="button" title="收起个股工具/K线">收起</button>
         </div>
 
         <form id="searchForm" class="search-box">
@@ -38,6 +39,7 @@
           <div id="indexGrid" class="mini-grid"></div>
         </section>
       </aside>
+      <button id="openStockWorkspaceRail" class="ghost-button stock-workspace-rail" type="button">个股/K线</button>
 
       <main class="workspace">
         <section class="topbar">
@@ -46,6 +48,7 @@
             <h2>明日短线雷达</h2>
           </div>
           <div class="actions">
+            <button id="toggleStockWorkspace" class="ghost-button" type="button">收起个股/K线</button>
             <button id="refreshAll" type="button">刷新行情</button>
             <span id="updatedAt" class="timestamp">等待数据</span>
           </div>
@@ -199,7 +202,7 @@
         </section>
 
         <section class="grid-layout">
-          <article class="panel quote-panel">
+          <article id="quotePanel" class="panel quote-panel">
             <div class="panel-head">
               <div>
                 <p class="eyebrow">Selected Stock</p>
@@ -322,24 +325,12 @@
           </article>
         </section>
 
-        <section class="panel prediction-notes-panel">
-          <div class="panel-head">
-            <div>
-              <h2>预测便签</h2>
-              <p class="panel-subtitle">集中收纳各个预测板块，先看摘要，再展开明细</p>
-            </div>
-          </div>
-          <div id="predictionNotes" class="prediction-notes">
-            <div class="prediction-note-card muted">等待预测数据</div>
-          </div>
-        </section>
-
         <section class="board-grid market-board">
-          <article id="firstBoardPanel" class="panel table-panel first-board-panel">
+          <article class="panel table-panel first-board-panel">
             <div class="panel-head">
               <div>
                 <h2>冲高5%预测</h2>
-                <p class="panel-subtitle">第一天尾盘最后30分钟预测，次日盘中最高价验证是否冲高 5% 以上</p>
+                <p class="panel-subtitle">尾盘30分钟给出保守候选，次日盘中最高价验证是否冲高 5% 以上</p>
               </div>
               <div class="panel-actions">
                 <button id="saveHighOpenSnapshot" class="ghost-button" type="button">记录尾盘预测</button>
@@ -362,6 +353,7 @@
                   <button id="resetHighOpenFilter" class="ghost-button" type="button">重置价格</button>
                   <span id="highOpenFilterStatus">价格不限</span>
                 </div>
+                <div class="model-note">v4保守口径：优先尾盘涨幅 5.2%-8.4%、成交额放大、换手不过热、量比不过热；评分只排序，不等于真实胜率。</div>
               </div>
               <div class="rush-insight-card">
                 <div id="highOpenAccuracy" class="accuracy-panel">
@@ -379,7 +371,13 @@
                   </div>
                   <p id="highOpenAccuracyNote">记录预测后，会按次日盘中最高价自动结算是否冲高 5% 以上。</p>
                 </div>
-                <div id="highOpenHistoryList" class="prediction-history-list"></div>
+                <div id="highOpenHistoryBox" class="prediction-history-box">
+                  <div class="history-toolbar">
+                    <span>预览历史数据</span>
+                    <button class="ghost-button history-zoom-button" type="button" data-history-zoom="highOpenHistoryBox">放大</button>
+                  </div>
+                  <div id="highOpenHistoryList" class="prediction-history-list"></div>
+                </div>
               </div>
             </div>
             <div class="table-wrap rush-table-wrap">
@@ -387,7 +385,7 @@
                 <thead>
                   <tr>
                     <th>股票</th>
-                    <th>冲高概率</th>
+                    <th>模型评分</th>
                     <th>预测条件</th>
                     <th>关键因素</th>
                     <th>风控</th>
@@ -398,7 +396,7 @@
             </div>
           </article>
 
-          <article id="limitPredictionPanel" class="panel table-panel limit-panel">
+          <article class="panel table-panel limit-panel">
             <div class="panel-head">
               <div>
                 <h2>明日涨停预测榜</h2>
@@ -425,7 +423,13 @@
               </div>
               <p id="predictionAccuracyNote">记录预测后，次日会按实际涨停池自动结算。</p>
             </div>
-            <div id="predictionHistoryList" class="prediction-history-list"></div>
+            <div id="predictionHistoryBox" class="prediction-history-box">
+              <div class="history-toolbar">
+                <span>预测历史数据</span>
+                <button class="ghost-button history-zoom-button" type="button" data-history-zoom="predictionHistoryBox">放大</button>
+              </div>
+              <div id="predictionHistoryList" class="prediction-history-list"></div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
