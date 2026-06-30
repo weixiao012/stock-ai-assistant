@@ -293,7 +293,8 @@ textarea {
 .market-board {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
-    "first limit"
+    "first first"
+    "limit limit"
     "flow flow"
     "sector sector";
   align-items: start;
@@ -1485,7 +1486,8 @@ tr:last-child td {
   .market-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
-      "first limit"
+      "first first"
+      "limit limit"
       "flow flow"
       "sector sector";
   }
