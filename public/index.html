@@ -335,36 +335,42 @@
                 <button id="reloadFirstBoard" class="ghost-button" type="button">刷新</button>
               </div>
             </div>
-            <div id="highOpenWindowStatus" class="window-status">尾盘预测窗口：交易日 14:30-15:00</div>
-            <div class="filter-bar high-open-filter">
-              <label>
-                最低价
-                <input id="highOpenMinPrice" type="number" min="0" step="0.01" placeholder="不限">
-              </label>
-              <label>
-                最高价
-                <input id="highOpenMaxPrice" type="number" min="0" step="0.01" placeholder="不限">
-              </label>
-              <button id="resetHighOpenFilter" class="ghost-button" type="button">重置价格</button>
-              <span id="highOpenFilterStatus">价格不限</span>
+            <div class="rush-dashboard">
+              <div class="rush-control-card">
+                <div id="highOpenWindowStatus" class="window-status">尾盘预测窗口：交易日 14:30-15:00</div>
+                <div class="filter-bar high-open-filter">
+                  <label>
+                    最低价
+                    <input id="highOpenMinPrice" type="number" min="0" step="0.01" placeholder="不限">
+                  </label>
+                  <label>
+                    最高价
+                    <input id="highOpenMaxPrice" type="number" min="0" step="0.01" placeholder="不限">
+                  </label>
+                  <button id="resetHighOpenFilter" class="ghost-button" type="button">重置价格</button>
+                  <span id="highOpenFilterStatus">价格不限</span>
+                </div>
+              </div>
+              <div class="rush-insight-card">
+                <div id="highOpenAccuracy" class="accuracy-panel">
+                  <div class="accuracy-card">
+                    <span>Top5命中</span>
+                    <strong>--</strong>
+                  </div>
+                  <div class="accuracy-card">
+                    <span>Top10命中</span>
+                    <strong>--</strong>
+                  </div>
+                  <div class="accuracy-card">
+                    <span>累计样本</span>
+                    <strong>--</strong>
+                  </div>
+                  <p id="highOpenAccuracyNote">记录预测后，会按次日盘中最高价自动结算是否冲高 5% 以上。</p>
+                </div>
+                <div id="highOpenHistoryList" class="prediction-history-list"></div>
+              </div>
             </div>
-            <div id="highOpenAccuracy" class="accuracy-panel">
-              <div class="accuracy-card">
-                <span>Top5命中</span>
-                <strong>--</strong>
-              </div>
-              <div class="accuracy-card">
-                <span>Top10命中</span>
-                <strong>--</strong>
-              </div>
-              <div class="accuracy-card">
-                <span>累计样本</span>
-                <strong>--</strong>
-              </div>
-              <p id="highOpenAccuracyNote">记录预测后，会按次日盘中最高价自动结算是否冲高 5% 以上。</p>
-            </div>
-            <div id="highOpenHistoryList" class="prediction-history-list"></div>
-            <div class="table-wrap">
+            <div class="table-wrap rush-table-wrap">
               <table>
                 <thead>
                   <tr>

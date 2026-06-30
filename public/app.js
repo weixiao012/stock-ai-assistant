@@ -1076,7 +1076,7 @@ function renderFirstBoard() {
       <td><b class="${item.firstBoardProbability >= 76 ? "red" : "amber"}">${item.firstBoardProbability}</b></td>
       <td>${item.trigger}</td>
       <td>${factorSummary(item)}<br><span class="sector-meta">股性 ${item.temper} · 板块 ${item.industry || "--"}</span></td>
-      <td class="plan-cell">${item.risk}<br><span class="sector-meta">${firstBoardConditionPlan(item)}</span><br><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 前一天未涨停 次日盘中冲高5%以上 主力资金 人气排名`)}">同花顺验证</a></td>
+      <td class="plan-cell">${item.risk}<span class="rush-condition">${firstBoardConditionPlan(item)}</span><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 前一天未涨停 次日盘中冲高5%以上 主力资金 人气排名`)}">同花顺验证</a></td>
     </tr>
   `).join("");
 }

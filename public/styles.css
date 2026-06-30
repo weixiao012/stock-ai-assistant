@@ -61,6 +61,7 @@ a:hover {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   min-height: 100vh;
+  min-width: 0;
 }
 
 .sidebar {
@@ -70,12 +71,14 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .brand {
   display: flex;
   gap: 12px;
   align-items: center;
+  min-width: 0;
 }
 
 .brand-mark {
@@ -124,6 +127,16 @@ h3 {
   color: var(--muted);
 }
 
+.timestamp,
+.panel-subtitle,
+.window-status,
+.sector-meta,
+#updatedAt,
+#predictionAccuracyNote,
+#highOpenAccuracyNote {
+  overflow-wrap: anywhere;
+}
+
 .search-box,
 .ths-form {
   display: grid;
@@ -134,6 +147,7 @@ h3 {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
+  min-width: 0;
 }
 
 input,
@@ -155,6 +169,7 @@ textarea {
   padding: 22px;
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .topbar,
@@ -164,6 +179,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .eyebrow {
@@ -183,6 +199,7 @@ textarea {
 
 .panel {
   padding: 16px;
+  min-width: 0;
 }
 
 .compact {
@@ -239,6 +256,53 @@ textarea {
   grid-area: first;
 }
 
+.first-board-panel .panel-head {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rush-dashboard {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+
+.rush-control-card,
+.rush-insight-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.rush-control-card {
+  display: grid;
+  gap: 10px;
+}
+
+.rush-insight-card {
+  display: grid;
+  gap: 8px;
+}
+
+.rush-table-wrap {
+  margin-top: 12px;
+}
+
+.rush-condition {
+  display: block;
+  margin: 8px 0;
+  border-left: 3px solid var(--blue);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 7px 8px;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
 .limit-panel {
   grid-area: limit;
 }
@@ -279,6 +343,24 @@ textarea {
   background: #f8fafc;
 }
 
+.rush-control-card .filter-bar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.rush-control-card .filter-bar button,
+.rush-control-card .filter-bar span {
+  grid-column: span 1;
+}
+
+.rush-control-card .filter-bar span {
+  align-self: center;
+  text-align: left;
+}
+
 .filter-bar label {
   display: grid;
   gap: 4px;
@@ -311,6 +393,11 @@ textarea {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.rush-control-card .window-status {
+  margin-top: 0;
+  background: #fff;
 }
 
 .window-status.active {
@@ -1171,6 +1258,10 @@ tr:last-child td {
   margin-top: 12px;
 }
 
+.rush-insight-card .accuracy-panel {
+  margin-top: 0;
+}
+
 .accuracy-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1188,7 +1279,8 @@ tr:last-child td {
   font-size: 20px;
 }
 
-#predictionAccuracyNote {
+#predictionAccuracyNote,
+#highOpenAccuracyNote {
   grid-column: 1 / -1;
   color: var(--muted);
   line-height: 1.5;
@@ -1200,6 +1292,12 @@ tr:last-child td {
   margin-top: 8px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.rush-insight-card .prediction-history-list {
+  max-height: 172px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .history-record {
@@ -1279,6 +1377,14 @@ tr:last-child td {
     text-align: left;
   }
 
+  .rush-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .rush-insight-card .prediction-history-list {
+    max-height: 210px;
+  }
+
   .expert-trade-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1305,9 +1411,16 @@ tr:last-child td {
   .settings-grid,
   .trade-plan,
   .filter-bar,
+  .rush-control-card .filter-bar,
+  .accuracy-panel,
   .position-inputs,
   .agents-summary {
     grid-template-columns: 1fr;
+  }
+
+  .rush-control-card .filter-bar button,
+  .rush-control-card .filter-bar span {
+    grid-column: auto;
   }
 
   .ai-picks-grid {
@@ -1318,16 +1431,27 @@ tr:last-child td {
   }
 
   .market-board {
-    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    grid-template-columns: 1fr;
     grid-template-areas:
-      "first limit"
-      "flow flow"
-      "sector sector";
-    overflow-x: auto;
+      "first"
+      "limit"
+      "flow"
+      "sector";
+    overflow-x: visible;
   }
 
   .panel-actions {
     justify-content: stretch;
+    width: 100%;
+  }
+
+  .actions > *,
+  .panel-actions > * {
+    width: 100%;
+  }
+
+  .search-row {
+    grid-template-columns: 1fr;
   }
 
   .ths-links {
