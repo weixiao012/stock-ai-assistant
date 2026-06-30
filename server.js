@@ -950,6 +950,14 @@ function fallbackFlowPoints(item, period, pointLimit) {
   });
 }
 
+function withTimeout(promise, timeoutMs) {
+  let timeout;
+  const timer = new Promise((_, reject) => {
+    timeout = setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+  return Promise.race([promise, timer]).finally(() => clearTimeout(timeout));
+}
+
 async function sectorFlowLines(reqUrl) {
   const limit = Math.max(3, Math.min(12, Number(reqUrl.searchParams.get("limit") || 8)));
   const period = ["day", "week", "month"].includes(reqUrl.searchParams.get("period"))
@@ -962,10 +970,10 @@ async function sectorFlowLines(reqUrl) {
     .sort((a, b) => Math.abs(num(b.mainNetInflow)) - Math.abs(num(a.mainNetInflow)))
     .slice(0, limit);
   const seriesResults = await Promise.allSettled(selected.map(async (item) => {
-    const points = await (period === "day"
+    const request = period === "day"
       ? sectorMinuteFundFlow(item.code, pointLimit)
-      : sectorDailyFundFlow(item.code, pointLimit)
-    ).catch(() => []);
+      : sectorDailyFundFlow(item.code, pointLimit);
+    const points = await withTimeout(request, 5000).catch(() => []);
     return {
       code: item.code,
       name: item.name,
