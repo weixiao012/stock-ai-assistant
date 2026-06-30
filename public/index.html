@@ -1,0 +1,468 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>A股智能分析助手</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">AI</div>
+          <div>
+            <h1>A股智能分析助手</h1>
+            <p>涨停预测 · 操作计划 · 同花顺参考</p>
+          </div>
+        </div>
+
+        <form id="searchForm" class="search-box">
+          <label for="stockInput">股票代码</label>
+          <div class="search-row">
+            <input id="stockInput" name="stockInput" inputmode="numeric" maxlength="6" placeholder="例如 300059">
+            <button type="submit">分析</button>
+          </div>
+        </form>
+
+        <section class="panel watch-panel">
+          <div class="panel-head">
+            <h2>自选</h2>
+            <button id="addWatch" class="ghost-button" type="button">加入</button>
+          </div>
+          <div id="watchList" class="watch-list"></div>
+        </section>
+
+        <section class="panel compact">
+          <h2>指数温度</h2>
+          <div id="indexGrid" class="mini-grid"></div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <section class="topbar">
+          <div>
+            <p class="eyebrow">Trading Desk</p>
+            <h2>明日短线雷达</h2>
+          </div>
+          <div class="actions">
+            <button id="refreshAll" type="button">刷新行情</button>
+            <span id="updatedAt" class="timestamp">等待数据</span>
+          </div>
+        </section>
+
+        <section class="score-strip">
+          <article class="score-card primary">
+            <div>
+              <p>短线综合评分</p>
+              <strong id="scoreValue">--</strong>
+            </div>
+            <span id="scoreLabel">输入代码开始</span>
+          </article>
+          <article class="score-card">
+            <p>市场情绪</p>
+            <strong id="marketMood">--</strong>
+            <span id="marketMoodText">读取中</span>
+          </article>
+          <article class="score-card">
+            <p>板块强度</p>
+            <strong id="sectorScore">--</strong>
+            <span id="sectorScoreText">等待匹配</span>
+          </article>
+          <article class="score-card">
+            <p>涨停接力</p>
+            <strong id="limitScore">--</strong>
+            <span id="limitScoreText">等待涨停池</span>
+          </article>
+
+          <article class="panel stock-chat-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Stock AI Chat</p>
+                <h2>AI智能助手</h2>
+              </div>
+              <button id="clearStockChat" class="ghost-button" type="button">清空</button>
+            </div>
+            <div id="stockChatMessages" class="chat-messages">
+              <div class="chat-message assistant">
+                <strong>AI智能助手</strong>
+                <p>我会结合当前选中股票、成本、股数、实时行情、资金流和多智能体分析回答。示例：现在京东方A要不要卖？金风科技可买吗？</p>
+              </div>
+            </div>
+            <form id="stockChatForm" class="chat-form">
+              <textarea id="stockChatInput" rows="3" placeholder="输入你的问题，例如：000725 现在还能持有吗？"></textarea>
+              <button type="submit">提问</button>
+            </form>
+          </article>
+        </section>
+
+        <section class="ai-picks-grid">
+          <article class="panel ai-picks-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">AI Stock Picking</p>
+                <h2>AI 自动选股</h2>
+              </div>
+              <button id="autoPick" class="ghost-button" type="button">重新选股</button>
+            </div>
+            <div id="aiPicks" class="pick-list"></div>
+          </article>
+
+          <article class="panel settings-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">T Strategy</p>
+                <h2>T 操作条件</h2>
+              </div>
+              <button id="resetSettings" class="ghost-button" type="button">默认</button>
+            </div>
+            <form id="settingsForm" class="settings-grid">
+              <label>
+                最低预测分
+                <input id="setMinScore" type="number" min="0" max="99" step="1">
+              </label>
+              <label>
+                最高换手%
+                <input id="setMaxTurnover" type="number" min="1" max="80" step="0.5">
+              </label>
+              <label>
+                高开上限%
+                <input id="setMaxHighOpen" type="number" min="0" max="20" step="0.5">
+              </label>
+              <label>
+                低吸回落%
+                <input id="setDipBuy" type="number" min="0" max="15" step="0.5">
+              </label>
+              <label>
+                T卖出涨幅%
+                <input id="setTRiseSell" type="number" min="0.5" max="20" step="0.5">
+              </label>
+              <label>
+                止损%
+                <input id="setStopLoss" type="number" min="1" max="15" step="0.5">
+              </label>
+              <label>
+                风格
+                <select id="setStyle">
+                  <option value="balanced">均衡接力</option>
+                  <option value="aggressive">激进打板</option>
+                  <option value="dip">分歧低吸</option>
+                  <option value="t">持仓做T</option>
+                </select>
+              </label>
+              <label class="check-row">
+                <input id="setOnlyGoodTemper" type="checkbox">
+                只看股性好
+              </label>
+            </form>
+          </article>
+
+          <article class="panel expert-trades-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">THS Public Records</p>
+                <h2>同花顺参考</h2>
+              </div>
+              <div class="panel-actions">
+                <button id="openExpertSearch" class="ghost-button" type="button">同花顺搜索</button>
+                <button id="clearExpertTrades" class="ghost-button" type="button">清空</button>
+              </div>
+            </div>
+            <p class="panel-subtitle">优先展示公开可见的高收益股民/组合样例，只做参考，不作为跟单建议。</p>
+            <div id="expertRecommendList" class="expert-recommend-list"></div>
+            <div id="expertTradeList" class="expert-trade-list"></div>
+            <details class="expert-input-drawer">
+              <summary>添加/维护记录</summary>
+              <form id="expertTradeForm" class="expert-trade-form">
+                <input id="expertName" placeholder="高手/组合名称">
+                <input id="expertReturn" type="number" step="0.1" placeholder="收益率%">
+                <input id="expertWins" type="number" min="0" step="1" placeholder="成功次数">
+                <input id="expertSamples" type="number" min="1" step="1" placeholder="样本数">
+                <input id="expertDrawdown" type="number" min="0" step="0.1" placeholder="最大回撤%">
+                <input id="expertCode" inputmode="numeric" maxlength="6" placeholder="股票代码">
+                <input id="expertStock" placeholder="股票名称">
+                <select id="expertAction">
+                  <option value="买入">买入</option>
+                  <option value="卖出">卖出</option>
+                  <option value="加仓">加仓</option>
+                  <option value="减仓">减仓</option>
+                  <option value="持有">持有</option>
+                </select>
+                <input id="expertPrice" type="number" step="0.001" placeholder="价格">
+                <input id="expertPosition" placeholder="仓位/数量">
+                <button type="submit">添加记录</button>
+                <textarea id="expertReason" rows="2" placeholder="来源/理由，例如：同花顺公开组合、收益率前排、买入逻辑"></textarea>
+              </form>
+            </details>
+          </article>
+
+        </section>
+
+        <section class="grid-layout">
+          <article class="panel quote-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Selected Stock</p>
+                <h2 id="stockTitle">未选择股票</h2>
+              </div>
+              <button id="openEastmoney" class="ghost-button" type="button">东方财富</button>
+            </div>
+            <div id="quoteMetrics" class="metric-grid"></div>
+            <div class="kline-box">
+              <div class="panel-head slim">
+                <h3>K线与日线数据</h3>
+                <button id="reloadKline" class="ghost-button" type="button">刷新K线</button>
+              </div>
+              <canvas id="klineCanvas" width="880" height="320"></canvas>
+              <div class="table-wrap kline-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>日期</th>
+                      <th>开盘</th>
+                      <th>收盘</th>
+                      <th>最高</th>
+                      <th>最低</th>
+                      <th>涨跌幅</th>
+                      <th>成交额</th>
+                      <th>换手</th>
+                    </tr>
+                  </thead>
+                  <tbody id="klineTable"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="chanView" class="chan-view">
+              <div class="panel-head slim">
+                <h3>缠论结构分析</h3>
+                <span>分型 / 笔 / 中枢 / 背驰</span>
+              </div>
+              <p>选择股票后，根据日 K 线自动识别结构信号。</p>
+            </div>
+            <div id="assistantView" class="assistant-view">
+              <h3>智能结论</h3>
+              <p>输入股票代码后，我会给出明日涨停概率、介入条件、止损线和放弃条件。同花顺数据用于二次修正，不会自动替你下单。</p>
+            </div>
+            <div class="agents-box">
+              <div class="panel-head slim">
+                <h3>TradingAgents 多智能体分析</h3>
+                <button id="runTradingAgents" class="ghost-button" type="button">运行分析</button>
+              </div>
+              <div class="position-inputs">
+                <label>
+                  成本
+                  <input id="agentCost" type="number" step="0.001" placeholder="可选">
+                </label>
+                <label>
+                  股数
+                  <input id="agentShares" type="number" step="100" placeholder="可选">
+                </label>
+              </div>
+              <div id="tradingAgentsView" class="agents-view">选择股票后可运行多角色分析：技术、资金、风险、交易员。</div>
+            </div>
+          </article>
+
+          <article class="panel ths-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">TongHuaShun</p>
+                <h2>同花顺参考</h2>
+              </div>
+              <button id="openIwc" class="ghost-button" type="button">问财</button>
+            </div>
+            <div class="ths-links">
+              <a id="thsSearch" target="_blank" rel="noreferrer">搜索个股</a>
+              <a id="thsHot" target="_blank" rel="noreferrer" href="https://www.iwencai.com/">问财热度</a>
+              <a target="_blank" rel="noreferrer" href="https://q.10jqka.com.cn/">行情中心</a>
+            </div>
+            <form id="thsForm" class="ths-form">
+              <label>
+                人气排名
+                <input id="thsRank" type="number" min="1" placeholder="越小越强">
+              </label>
+              <label>
+                主力净流入(万元)
+                <input id="thsFund" type="number" placeholder="例如 8500">
+              </label>
+              <label>
+                题材热度
+                <select id="thsTheme">
+                  <option value="0">未确认</option>
+                  <option value="8">同花顺热门前排</option>
+                  <option value="5">板块活跃</option>
+                  <option value="-4">题材退潮</option>
+                </select>
+              </label>
+              <label>
+                问财条件
+                <textarea id="thsQuery" rows="3">今日涨停，非ST，所属热门板块，封单金额大，明日可能连板</textarea>
+              </label>
+            </form>
+            <div class="ths-note">
+              <strong>自动化边界</strong>
+              <p>可以自动打开同花顺/问财查询、整理候选、生成交易计划；买入、卖出、撤单等资金操作必须由你本人确认执行。</p>
+            </div>
+            <div class="trade-desk">
+              <div class="panel-head slim">
+                <h3>同花顺半自动做T</h3>
+                <span id="tradeDeskStatus">等待选择股票</span>
+              </div>
+              <div class="trade-actions">
+                <button id="openThsLogin" class="ghost-button" type="button">打开同花顺</button>
+                <button id="openThsStock" class="ghost-button" type="button">打开个股页</button>
+                <button id="copyTPlan" type="button">复制T计划</button>
+                <button id="markManualTrade" class="ghost-button" type="button">记录已手动执行</button>
+              </div>
+              <div id="manualTradeLog" class="manual-log">AI 只生成计划和提醒，不自动提交订单。</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="board-grid market-board">
+          <article class="panel table-panel first-board-panel">
+            <div class="panel-head">
+              <div>
+                <h2>高开5%预测</h2>
+                <p class="panel-subtitle">第一天尾盘最后30分钟预测，次日开盘验证是否高开 5% 以上</p>
+              </div>
+              <div class="panel-actions">
+                <button id="saveHighOpenSnapshot" class="ghost-button" type="button">记录尾盘预测</button>
+                <button id="refreshHighOpenHistory" class="ghost-button" type="button">准确度</button>
+                <button id="reloadFirstBoard" class="ghost-button" type="button">刷新</button>
+              </div>
+            </div>
+            <div id="highOpenWindowStatus" class="window-status">尾盘预测窗口：交易日 14:30-15:00</div>
+            <div class="filter-bar high-open-filter">
+              <label>
+                最低价
+                <input id="highOpenMinPrice" type="number" min="0" step="0.01" placeholder="不限">
+              </label>
+              <label>
+                最高价
+                <input id="highOpenMaxPrice" type="number" min="0" step="0.01" placeholder="不限">
+              </label>
+              <button id="resetHighOpenFilter" class="ghost-button" type="button">重置价格</button>
+              <span id="highOpenFilterStatus">价格不限</span>
+            </div>
+            <div id="highOpenAccuracy" class="accuracy-panel">
+              <div class="accuracy-card">
+                <span>Top5命中</span>
+                <strong>--</strong>
+              </div>
+              <div class="accuracy-card">
+                <span>Top10命中</span>
+                <strong>--</strong>
+              </div>
+              <div class="accuracy-card">
+                <span>累计样本</span>
+                <strong>--</strong>
+              </div>
+              <p id="highOpenAccuracyNote">记录预测后，会按次日开盘价自动结算是否高开 5% 以上。</p>
+            </div>
+            <div id="highOpenHistoryList" class="prediction-history-list"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>股票</th>
+                    <th>高开概率</th>
+                    <th>预测条件</th>
+                    <th>关键因素</th>
+                    <th>风控</th>
+                  </tr>
+                </thead>
+                <tbody id="firstBoardTable"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel table-panel limit-panel">
+            <div class="panel-head">
+              <div>
+                <h2>明日涨停预测榜</h2>
+                <p class="panel-subtitle">预测概率榜，不等于买入指令</p>
+              </div>
+              <div class="panel-actions">
+                <button id="savePredictionSnapshot" class="ghost-button" type="button">记录预测</button>
+                <button id="refreshPredictionHistory" class="ghost-button" type="button">准确度</button>
+                <button id="reloadLimit" class="ghost-button" type="button">刷新</button>
+              </div>
+            </div>
+            <div id="predictionAccuracy" class="accuracy-panel">
+              <div class="accuracy-card">
+                <span>Top5命中</span>
+                <strong>--</strong>
+              </div>
+              <div class="accuracy-card">
+                <span>Top10命中</span>
+                <strong>--</strong>
+              </div>
+              <div class="accuracy-card">
+                <span>累计样本</span>
+                <strong>--</strong>
+              </div>
+              <p id="predictionAccuracyNote">记录预测后，次日会按实际涨停池自动结算。</p>
+            </div>
+            <div id="predictionHistoryList" class="prediction-history-list"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>股票</th>
+                    <th>概率</th>
+                    <th>来源</th>
+                    <th>核心理由</th>
+                    <th>操作建议</th>
+                    <th>同花顺</th>
+                  </tr>
+                </thead>
+                <tbody id="predictionTable"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article id="sectorPanel" class="panel table-panel sector-panel">
+            <div class="panel-head">
+              <div>
+                <h2>强势板块</h2>
+                <p id="sectorSummary" class="panel-subtitle">等待板块数据</p>
+              </div>
+              <div class="panel-actions">
+                <button id="toggleSector" class="ghost-button" type="button">概念</button>
+                <button id="toggleSectorPanel" class="ghost-button" type="button">收起</button>
+              </div>
+            </div>
+            <div id="sectorList" class="sector-list"></div>
+          </article>
+
+          <article class="panel table-panel flow-panel">
+            <div class="panel-head">
+              <div>
+                <h2>资金流向</h2>
+                <p class="panel-subtitle">盘中参考，盘后确认</p>
+              </div>
+              <button id="toggleFundFlow" class="ghost-button" type="button">个股</button>
+            </div>
+            <div class="flow-chart-box">
+              <div class="flow-chart-toolbar">
+                <div class="flow-period-tabs">
+                  <button class="ghost-button active" type="button" data-flow-period="day">日内</button>
+                  <button class="ghost-button" type="button" data-flow-period="week">近一周</button>
+                  <button class="ghost-button" type="button" data-flow-period="month">近一月</button>
+                </div>
+                <button id="toggleFlowFullscreen" class="ghost-button" type="button">全屏</button>
+              </div>
+              <div id="flowSyncStatus" class="flow-sync-status">等待同步</div>
+              <canvas id="sectorFlowCanvas" width="520" height="280"></canvas>
+              <div id="sectorFlowTooltip" class="flow-tooltip" hidden></div>
+              <div id="sectorFlowLegend" class="flow-legend"></div>
+            </div>
+            <div id="fundFlowList" class="fund-flow-list"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

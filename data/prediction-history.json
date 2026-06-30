@@ -1,0 +1,781 @@
+{
+  "snapshots": [
+    {
+      "date": "2026-06-29",
+      "targetDate": "2026-06-30",
+      "savedAt": "2026-06-29T15:30:35.787Z",
+      "status": "pending",
+      "modelVersion": "local-limit-v1",
+      "settings": {
+        "minScore": 72,
+        "maxTurnover": 28,
+        "maxHighOpen": 7,
+        "dipBuy": 3,
+        "tRiseSell": 4,
+        "stopLoss": 4,
+        "style": "balanced",
+        "onlyGoodTemper": true
+      },
+      "predictions": [
+        {
+          "rank": 1,
+          "code": "002407",
+          "name": "多氟多",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:25:00封板 · 未炸板 · 换手+3.5%",
+          "temper": 95
+        },
+        {
+          "rank": 2,
+          "code": "301520",
+          "name": "万邦医药",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:25:00封板 · 炸板1次 · 换手+7.43%",
+          "temper": 88
+        },
+        {
+          "rank": 3,
+          "code": "688689",
+          "name": "银河微电",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:25:04封板 · 未炸板 · 换手+1.21%",
+          "temper": 89
+        },
+        {
+          "rank": 4,
+          "code": "600468",
+          "name": "百利电气",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:08封板 · 未炸板 · 换手+1.12%",
+          "temper": 87
+        },
+        {
+          "rank": 5,
+          "code": "003043",
+          "name": "华亚智能",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:47:36封板 · 未炸板 · 换手+4.97%",
+          "temper": 89
+        },
+        {
+          "rank": 6,
+          "code": "002038",
+          "name": "双鹭药业",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 10:10:57封板 · 未炸板 · 换手+4.19%",
+          "temper": 89
+        },
+        {
+          "rank": 7,
+          "code": "300436",
+          "name": "广生堂",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 10:12:06封板 · 未炸板 · 换手+9.92%",
+          "temper": 95
+        },
+        {
+          "rank": 8,
+          "code": "002693",
+          "name": "双成药业",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 10:15:06封板 · 未炸板 · 换手+5.27%",
+          "temper": 89
+        },
+        {
+          "rank": 9,
+          "code": "002370",
+          "name": "亚太药业",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 10:16:24封板 · 未炸板 · 换手+4.44%",
+          "temper": 89
+        },
+        {
+          "rank": 10,
+          "code": "000566",
+          "name": "海南海药",
+          "probability": 98,
+          "source": "涨停接力",
+          "reason": "1板 · 10:11:06封板 · 未炸板 · 换手+7.58%",
+          "temper": 89
+        },
+        {
+          "rank": 11,
+          "code": "002821",
+          "name": "凯莱英",
+          "probability": 97,
+          "source": "涨停接力",
+          "reason": "1板 · 10:18:03封板 · 未炸板 · 换手+3.34%",
+          "temper": 95
+        },
+        {
+          "rank": 12,
+          "code": "300434",
+          "name": "金石亚药",
+          "probability": 96,
+          "source": "涨停接力",
+          "reason": "1板 · 13:03:21封板 · 未炸板 · 换手+11.34%",
+          "temper": 89
+        },
+        {
+          "rank": 13,
+          "code": "688796",
+          "name": "百奥赛图",
+          "probability": 96,
+          "source": "涨停接力",
+          "reason": "1板 · 13:06:18封板 · 未炸板 · 换手+9.88%",
+          "temper": 89
+        },
+        {
+          "rank": 14,
+          "code": "601636",
+          "name": "旗滨集团",
+          "probability": 95,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:28封板 · 未炸板 · 换手+2.81%",
+          "temper": 87
+        },
+        {
+          "rank": 15,
+          "code": "603928",
+          "name": "兴业股份",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "2板 · 09:37:40封板 · 未炸板 · 换手+5%",
+          "temper": 88
+        },
+        {
+          "rank": 16,
+          "code": "300204",
+          "name": "舒泰神",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "1板 · 10:45:27封板 · 未炸板 · 换手+12.28%",
+          "temper": 95
+        },
+        {
+          "rank": 17,
+          "code": "600488",
+          "name": "津药药业",
+          "probability": 93,
+          "source": "涨停接力",
+          "reason": "1板 · 10:20:17封板 · 炸板1次 · 换手+8.65%",
+          "temper": 80
+        },
+        {
+          "rank": 18,
+          "code": "605300",
+          "name": "佳禾食品",
+          "probability": 92,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:09封板 · 未炸板 · 换手+1.67%",
+          "temper": 81
+        },
+        {
+          "rank": 19,
+          "code": "600363",
+          "name": "联创光电",
+          "probability": 92,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:34封板 · 未炸板 · 换手+1.38%",
+          "temper": 79
+        },
+        {
+          "rank": 20,
+          "code": "300024",
+          "name": "机器人",
+          "probability": 92,
+          "source": "强势首板",
+          "reason": "换手+10.09% · 成交26.51亿",
+          "temper": 74
+        },
+        {
+          "rank": 21,
+          "code": "600222",
+          "name": "太龙药业",
+          "probability": 90,
+          "source": "涨停接力",
+          "reason": "1板 · 09:33:52封板 · 未炸板 · 换手+2.05%",
+          "temper": 73
+        },
+        {
+          "rank": 22,
+          "code": "688336",
+          "name": "三生国健",
+          "probability": 90,
+          "source": "涨停接力",
+          "reason": "1板 · 10:26:17封板 · 未炸板 · 换手+2.24%",
+          "temper": 87
+        },
+        {
+          "rank": 23,
+          "code": "603477",
+          "name": "巨星农牧",
+          "probability": 89,
+          "source": "涨停接力",
+          "reason": "1板 · 10:31:16封板 · 未炸板 · 换手+3.74%",
+          "temper": 81
+        },
+        {
+          "rank": 24,
+          "code": "002568",
+          "name": "百润股份",
+          "probability": 89,
+          "source": "涨停接力",
+          "reason": "2板 · 10:46:57封板 · 未炸板 · 换手+5.46%",
+          "temper": 88
+        },
+        {
+          "rank": 25,
+          "code": "002437",
+          "name": "誉衡药业",
+          "probability": 89,
+          "source": "涨停接力",
+          "reason": "1板 · 10:59:33封板 · 炸板1次 · 换手+5.58%",
+          "temper": 80
+        },
+        {
+          "rank": 26,
+          "code": "688120",
+          "name": "华海清科",
+          "probability": 89,
+          "source": "涨停接力",
+          "reason": "1板 · 14:50:44封板 · 未炸板 · 换手+3.7%",
+          "temper": 99
+        },
+        {
+          "rank": 27,
+          "code": "688629",
+          "name": "华丰科技",
+          "probability": 89,
+          "source": "强势首板",
+          "reason": "换手+9.06% · 成交70.48亿",
+          "temper": 72
+        },
+        {
+          "rank": 28,
+          "code": "688362",
+          "name": "甬矽电子",
+          "probability": 89,
+          "source": "强势首板",
+          "reason": "换手+11.15% · 成交41.78亿",
+          "temper": 78
+        },
+        {
+          "rank": 29,
+          "code": "002549",
+          "name": "凯美特气",
+          "probability": 88,
+          "source": "涨停接力",
+          "reason": "1板 · 09:25:00封板 · 炸板2次 · 换手+8.86%",
+          "temper": 83
+        },
+        {
+          "rank": 30,
+          "code": "000777",
+          "name": "中核科技",
+          "probability": 88,
+          "source": "涨停接力",
+          "reason": "1板 · 09:32:21封板 · 未炸板 · 换手+3.41%",
+          "temper": 81
+        }
+      ]
+    },
+    {
+      "date": "2026-06-28",
+      "targetDate": "2026-06-28",
+      "savedAt": "2026-06-28T13:05:54.492Z",
+      "status": "settled",
+      "modelVersion": "local-limit-v1",
+      "settings": {
+        "minScore": 72,
+        "maxTurnover": 28,
+        "maxHighOpen": 7,
+        "dipBuy": 3,
+        "tRiseSell": 4,
+        "stopLoss": 4,
+        "style": "balanced",
+        "onlyGoodTemper": true
+      },
+      "predictions": [
+        {
+          "rank": 1,
+          "code": "600228",
+          "name": "返利科技",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "3板 · 09:25:03封板 · 未炸板 · 换手+0.14%",
+          "temper": 88
+        },
+        {
+          "rank": 2,
+          "code": "603956",
+          "name": "威派格",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "2板 · 09:25:03封板 · 未炸板 · 换手+1.42%",
+          "temper": 88
+        },
+        {
+          "rank": 3,
+          "code": "002674",
+          "name": "兴业科技",
+          "probability": 97,
+          "source": "涨停接力",
+          "reason": "6板 · 09:25:00封板 · 未炸板 · 换手+2.57%",
+          "temper": 88
+        },
+        {
+          "rank": 4,
+          "code": "002568",
+          "name": "百润股份",
+          "probability": 96,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:00封板 · 未炸板 · 换手+1.64%",
+          "temper": 81
+        },
+        {
+          "rank": 5,
+          "code": "603861",
+          "name": "白云电器",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:02封板 · 未炸板 · 换手+2.32%",
+          "temper": 87
+        },
+        {
+          "rank": 6,
+          "code": "600962",
+          "name": "国投中鲁",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "2板 · 09:38:34封板 · 未炸板 · 换手+3.77%",
+          "temper": 88
+        },
+        {
+          "rank": 7,
+          "code": "688409",
+          "name": "富创精密",
+          "probability": 89,
+          "source": "涨停接力",
+          "reason": "1板 · 14:55:37封板 · 未炸板 · 换手+3.9%",
+          "temper": 99
+        },
+        {
+          "rank": 8,
+          "code": "001210",
+          "name": "金房能源",
+          "probability": 86,
+          "source": "涨停接力",
+          "reason": "1板 · 09:34:21封板 · 未炸板 · 换手+4.97%",
+          "temper": 81
+        },
+        {
+          "rank": 9,
+          "code": "603903",
+          "name": "中持股份",
+          "probability": 86,
+          "source": "涨停接力",
+          "reason": "1板 · 09:57:18封板 · 未炸板 · 换手+6.15%",
+          "temper": 81
+        },
+        {
+          "rank": 10,
+          "code": "600539",
+          "name": "狮头股份",
+          "probability": 86,
+          "source": "涨停接力",
+          "reason": "1板 · 10:26:40封板 · 未炸板 · 换手+7.87%",
+          "temper": 81
+        },
+        {
+          "rank": 11,
+          "code": "603928",
+          "name": "兴业股份",
+          "probability": 85,
+          "source": "涨停接力",
+          "reason": "1板 · 09:51:04封板 · 未炸板 · 换手+3.53%",
+          "temper": 81
+        },
+        {
+          "rank": 12,
+          "code": "600545",
+          "name": "卓郎智能",
+          "probability": 84,
+          "source": "涨停接力",
+          "reason": "1板 · 09:32:46封板 · 未炸板 · 换手+3.49%",
+          "temper": 81
+        },
+        {
+          "rank": 13,
+          "code": "603163",
+          "name": "圣晖集成",
+          "probability": 83,
+          "source": "涨停接力",
+          "reason": "1板 · 09:39:59封板 · 未炸板 · 换手+3.68%",
+          "temper": 81
+        },
+        {
+          "rank": 14,
+          "code": "603270",
+          "name": "金帝股份",
+          "probability": 82,
+          "source": "涨停接力",
+          "reason": "1板 · 09:56:01封板 · 未炸板 · 换手+9.96%",
+          "temper": 81
+        },
+        {
+          "rank": 15,
+          "code": "001400",
+          "name": "江顺科技",
+          "probability": 82,
+          "source": "涨停接力",
+          "reason": "1板 · 11:02:48封板 · 未炸板 · 换手+8.59%",
+          "temper": 81
+        },
+        {
+          "rank": 16,
+          "code": "605399",
+          "name": "晨光新材",
+          "probability": 82,
+          "source": "涨停接力",
+          "reason": "1板 · 13:18:45封板 · 未炸板 · 换手+3.51%",
+          "temper": 81
+        },
+        {
+          "rank": 17,
+          "code": "603261",
+          "name": "立航科技",
+          "probability": 81,
+          "source": "涨停接力",
+          "reason": "1板 · 09:49:53封板 · 未炸板 · 换手+2.29%",
+          "temper": 73
+        },
+        {
+          "rank": 18,
+          "code": "002106",
+          "name": "莱宝高科",
+          "probability": 80,
+          "source": "涨停接力",
+          "reason": "1板 · 09:35:21封板 · 炸板1次 · 换手+8.02%",
+          "temper": 78
+        },
+        {
+          "rank": 19,
+          "code": "003033",
+          "name": "征和工业",
+          "probability": 80,
+          "source": "涨停接力",
+          "reason": "1板 · 13:16:42封板 · 未炸板 · 换手+4.44%",
+          "temper": 81
+        },
+        {
+          "rank": 20,
+          "code": "603722",
+          "name": "阿科力",
+          "probability": 80,
+          "source": "涨停接力",
+          "reason": "1板 · 13:18:09封板 · 未炸板 · 换手+5.95%",
+          "temper": 81
+        },
+        {
+          "rank": 21,
+          "code": "688432",
+          "name": "有研硅",
+          "probability": 80,
+          "source": "涨停接力",
+          "reason": "1板 · 13:19:20封板 · 未炸板 · 换手+5.91%",
+          "temper": 95
+        },
+        {
+          "rank": 22,
+          "code": "001215",
+          "name": "千味央厨",
+          "probability": 80,
+          "source": "涨停接力",
+          "reason": "1板 · 13:47:12封板 · 未炸板 · 换手+7.17%",
+          "temper": 81
+        },
+        {
+          "rank": 23,
+          "code": "603155",
+          "name": "新亚强",
+          "probability": 79,
+          "source": "涨停接力",
+          "reason": "1板 · 13:35:54封板 · 未炸板 · 换手+6.63%",
+          "temper": 81
+        },
+        {
+          "rank": 24,
+          "code": "002930",
+          "name": "宏川智慧",
+          "probability": 79,
+          "source": "涨停接力",
+          "reason": "1板 · 14:34:30封板 · 未炸板 · 换手+4.51%",
+          "temper": 81
+        },
+        {
+          "rank": 25,
+          "code": "603698",
+          "name": "航天工程",
+          "probability": 76,
+          "source": "涨停接力",
+          "reason": "1板 · 10:21:13封板 · 未炸板 · 换手+6.09%",
+          "temper": 87
+        },
+        {
+          "rank": 26,
+          "code": "001289",
+          "name": "龙源电力",
+          "probability": 75,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:33封板 · 未炸板 · 换手+0.11%",
+          "temper": 73
+        },
+        {
+          "rank": 27,
+          "code": "600481",
+          "name": "双良节能",
+          "probability": 73,
+          "source": "涨停接力",
+          "reason": "1板 · 09:46:31封板 · 炸板1次 · 换手+5.93%",
+          "temper": 72
+        },
+        {
+          "rank": 28,
+          "code": "002119",
+          "name": "康强电子",
+          "probability": 73,
+          "source": "涨停接力",
+          "reason": "1板 · 11:27:18封板 · 炸板1次 · 换手+23.14%",
+          "temper": 82
+        },
+        {
+          "rank": 29,
+          "code": "601016",
+          "name": "节能风电",
+          "probability": 72,
+          "source": "涨停接力",
+          "reason": "1板 · 09:41:53封板 · 炸板1次 · 换手+4.68%",
+          "temper": 78
+        },
+        {
+          "rank": 30,
+          "code": "002910",
+          "name": "庄园牧场",
+          "probability": 72,
+          "source": "涨停接力",
+          "reason": "1板 · 13:26:15封板 · 未炸板 · 换手+19.91%",
+          "temper": 73
+        }
+      ],
+      "settledAt": "2026-06-28T13:05:54.536Z",
+      "actualLimitCount": 60,
+      "top5": {
+        "total": 5,
+        "hits": 5,
+        "rate": 100
+      },
+      "top10": {
+        "total": 10,
+        "hits": 10,
+        "rate": 100
+      },
+      "all": {
+        "total": 30,
+        "hits": 30,
+        "rate": 100
+      },
+      "hits": [
+        {
+          "code": "600228",
+          "name": "返利科技",
+          "rank": 1,
+          "probability": 99
+        },
+        {
+          "code": "603956",
+          "name": "威派格",
+          "rank": 2,
+          "probability": 99
+        },
+        {
+          "code": "002674",
+          "name": "兴业科技",
+          "rank": 3,
+          "probability": 97
+        },
+        {
+          "code": "002568",
+          "name": "百润股份",
+          "rank": 4,
+          "probability": 96
+        },
+        {
+          "code": "603861",
+          "name": "白云电器",
+          "rank": 5,
+          "probability": 94
+        },
+        {
+          "code": "600962",
+          "name": "国投中鲁",
+          "rank": 6,
+          "probability": 94
+        },
+        {
+          "code": "688409",
+          "name": "富创精密",
+          "rank": 7,
+          "probability": 89
+        },
+        {
+          "code": "001210",
+          "name": "金房能源",
+          "rank": 8,
+          "probability": 86
+        },
+        {
+          "code": "603903",
+          "name": "中持股份",
+          "rank": 9,
+          "probability": 86
+        },
+        {
+          "code": "600539",
+          "name": "狮头股份",
+          "rank": 10,
+          "probability": 86
+        },
+        {
+          "code": "603928",
+          "name": "兴业股份",
+          "rank": 11,
+          "probability": 85
+        },
+        {
+          "code": "600545",
+          "name": "卓郎智能",
+          "rank": 12,
+          "probability": 84
+        },
+        {
+          "code": "603163",
+          "name": "圣晖集成",
+          "rank": 13,
+          "probability": 83
+        },
+        {
+          "code": "603270",
+          "name": "金帝股份",
+          "rank": 14,
+          "probability": 82
+        },
+        {
+          "code": "001400",
+          "name": "江顺科技",
+          "rank": 15,
+          "probability": 82
+        },
+        {
+          "code": "605399",
+          "name": "晨光新材",
+          "rank": 16,
+          "probability": 82
+        },
+        {
+          "code": "603261",
+          "name": "立航科技",
+          "rank": 17,
+          "probability": 81
+        },
+        {
+          "code": "002106",
+          "name": "莱宝高科",
+          "rank": 18,
+          "probability": 80
+        },
+        {
+          "code": "003033",
+          "name": "征和工业",
+          "rank": 19,
+          "probability": 80
+        },
+        {
+          "code": "603722",
+          "name": "阿科力",
+          "rank": 20,
+          "probability": 80
+        },
+        {
+          "code": "688432",
+          "name": "有研硅",
+          "rank": 21,
+          "probability": 80
+        },
+        {
+          "code": "001215",
+          "name": "千味央厨",
+          "rank": 22,
+          "probability": 80
+        },
+        {
+          "code": "603155",
+          "name": "新亚强",
+          "rank": 23,
+          "probability": 79
+        },
+        {
+          "code": "002930",
+          "name": "宏川智慧",
+          "rank": 24,
+          "probability": 79
+        },
+        {
+          "code": "603698",
+          "name": "航天工程",
+          "rank": 25,
+          "probability": 76
+        },
+        {
+          "code": "001289",
+          "name": "龙源电力",
+          "rank": 26,
+          "probability": 75
+        },
+        {
+          "code": "600481",
+          "name": "双良节能",
+          "rank": 27,
+          "probability": 73
+        },
+        {
+          "code": "002119",
+          "name": "康强电子",
+          "rank": 28,
+          "probability": 73
+        },
+        {
+          "code": "601016",
+          "name": "节能风电",
+          "rank": 29,
+          "probability": 72
+        },
+        {
+          "code": "002910",
+          "name": "庄园牧场",
+          "rank": 30,
+          "probability": 72
+        }
+      ]
+    }
+  ]
+}
