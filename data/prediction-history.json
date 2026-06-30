@@ -1,10 +1,299 @@
 {
   "snapshots": [
     {
+      "date": "2026-06-30",
+      "targetDate": "2026-07-01",
+      "savedAt": "2026-06-30T04:06:00.766Z",
+      "status": "pending",
+      "modelVersion": "local-limit-v1",
+      "settings": {
+        "minScore": 72,
+        "maxTurnover": 28,
+        "maxHighOpen": 7,
+        "dipBuy": 3,
+        "tRiseSell": 4,
+        "stopLoss": 4,
+        "style": "balanced",
+        "onlyGoodTemper": true
+      },
+      "predictions": [
+        {
+          "rank": 1,
+          "code": "002273",
+          "name": "水晶光电",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:30:00封板 · 未炸板 · 换手+2.56%",
+          "temper": 95
+        },
+        {
+          "rank": 2,
+          "code": "603928",
+          "name": "兴业股份",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "3板 · 09:31:17封板 · 未炸板 · 换手+3.58%",
+          "temper": 88
+        },
+        {
+          "rank": 3,
+          "code": "002106",
+          "name": "莱宝高科",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:37:15封板 · 未炸板 · 换手+5.46%",
+          "temper": 89
+        },
+        {
+          "rank": 4,
+          "code": "300269",
+          "name": "联建光电",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:37:33封板 · 未炸板 · 换手+5.92%",
+          "temper": 89
+        },
+        {
+          "rank": 5,
+          "code": "002396",
+          "name": "星网锐捷",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:43:42封板 · 未炸板 · 换手+2.52%",
+          "temper": 79
+        },
+        {
+          "rank": 6,
+          "code": "600707",
+          "name": "彩虹股份",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:47:46封板 · 未炸板 · 换手+5.67%",
+          "temper": 99
+        },
+        {
+          "rank": 7,
+          "code": "000100",
+          "name": "TCL科技",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 09:56:48封板 · 未炸板 · 换手+5.78%",
+          "temper": 99
+        },
+        {
+          "rank": 8,
+          "code": "600601",
+          "name": "方正科技",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "1板 · 10:30:56封板 · 未炸板 · 换手+4.44%",
+          "temper": 95
+        },
+        {
+          "rank": 9,
+          "code": "600363",
+          "name": "联创光电",
+          "probability": 99,
+          "source": "涨停接力",
+          "reason": "2板 · 11:15:44封板 · 未炸板 · 换手+8.7%",
+          "temper": 99
+        },
+        {
+          "rank": 10,
+          "code": "603078",
+          "name": "江化微",
+          "probability": 97,
+          "source": "涨停接力",
+          "reason": "1板 · 10:18:05封板 · 未炸板 · 换手+11.23%",
+          "temper": 93
+        },
+        {
+          "rank": 11,
+          "code": "002182",
+          "name": "宝武镁业",
+          "probability": 97,
+          "source": "涨停接力",
+          "reason": "1板 · 11:04:42封板 · 未炸板 · 换手+6.1%",
+          "temper": 87
+        },
+        {
+          "rank": 12,
+          "code": "000603",
+          "name": "盛达资源",
+          "probability": 96,
+          "source": "涨停接力",
+          "reason": "1板 · 09:25:00封板 · 未炸板 · 换手+1.07%",
+          "temper": 81
+        },
+        {
+          "rank": 13,
+          "code": "603950",
+          "name": "长源东谷",
+          "probability": 96,
+          "source": "涨停接力",
+          "reason": "2板 · 09:31:47封板 · 未炸板 · 换手+1.4%",
+          "temper": 80
+        },
+        {
+          "rank": 14,
+          "code": "001229",
+          "name": "魅视科技",
+          "probability": 96,
+          "source": "涨停接力",
+          "reason": "2板 · 09:34:42封板 · 未炸板 · 换手+4.6%",
+          "temper": 88
+        },
+        {
+          "rank": 15,
+          "code": "300545",
+          "name": "联得装备",
+          "probability": 95,
+          "source": "涨停接力",
+          "reason": "1板 · 09:36:48封板 · 未炸板 · 换手+13.96%",
+          "temper": 89
+        },
+        {
+          "rank": 16,
+          "code": "002446",
+          "name": "盛路通信",
+          "probability": 95,
+          "source": "涨停接力",
+          "reason": "1板 · 09:47:27封板 · 未炸板 · 换手+4.84%",
+          "temper": 87
+        },
+        {
+          "rank": 17,
+          "code": "301165",
+          "name": "锐捷网络",
+          "probability": 95,
+          "source": "涨停接力",
+          "reason": "1板 · 09:54:06封板 · 未炸板 · 换手+1.92%",
+          "temper": 85
+        },
+        {
+          "rank": 18,
+          "code": "603033",
+          "name": "三维股份",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "2板 · 09:38:01封板 · 未炸板 · 换手+1.2%",
+          "temper": 80
+        },
+        {
+          "rank": 19,
+          "code": "002628",
+          "name": "成都路桥",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "2板 · 10:32:36封板 · 未炸板 · 换手+7.88%",
+          "temper": 88
+        },
+        {
+          "rank": 20,
+          "code": "002600",
+          "name": "领益智造",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "1板 · 10:51:30封板 · 未炸板 · 换手+3.88%",
+          "temper": 97
+        },
+        {
+          "rank": 21,
+          "code": "600405",
+          "name": "动力源",
+          "probability": 94,
+          "source": "涨停接力",
+          "reason": "1板 · 11:22:50封板 · 未炸板 · 换手+3.38%",
+          "temper": 81
+        },
+        {
+          "rank": 22,
+          "code": "000004",
+          "name": "国华退",
+          "probability": 93,
+          "source": "涨停接力",
+          "reason": "2板 · 09:36:33封板 · 未炸板 · 换手+1.55%",
+          "temper": 80
+        },
+        {
+          "rank": 23,
+          "code": "002310",
+          "name": "东方新能",
+          "probability": 93,
+          "source": "涨停接力",
+          "reason": "1板 · 09:40:15封板 · 未炸板 · 换手+2.29%",
+          "temper": 73
+        },
+        {
+          "rank": 24,
+          "code": "003043",
+          "name": "华亚智能",
+          "probability": 93,
+          "source": "涨停接力",
+          "reason": "2板 · 09:49:45封板 · 未炸板 · 换手+8.06%",
+          "temper": 88
+        },
+        {
+          "rank": 25,
+          "code": "605018",
+          "name": "长华集团",
+          "probability": 93,
+          "source": "涨停接力",
+          "reason": "1板 · 11:24:15封板 · 未炸板 · 换手+2.75%",
+          "temper": 73
+        },
+        {
+          "rank": 26,
+          "code": "603118",
+          "name": "共进股份",
+          "probability": 93,
+          "source": "涨停接力",
+          "reason": "1板 · 11:24:47封板 · 炸板1次 · 换手+3.59%",
+          "temper": 78
+        },
+        {
+          "rank": 27,
+          "code": "603222",
+          "name": "济民健康",
+          "probability": 92,
+          "source": "涨停接力",
+          "reason": "2板 · 09:30:51封板 · 未炸板 · 换手+1.78%",
+          "temper": 80
+        },
+        {
+          "rank": 28,
+          "code": "301379",
+          "name": "天山电子",
+          "probability": 92,
+          "source": "涨停接力",
+          "reason": "1板 · 10:10:15封板 · 未炸板 · 换手+15.98%",
+          "temper": 95
+        },
+        {
+          "rank": 29,
+          "code": "002167",
+          "name": "东方锆业",
+          "probability": 92,
+          "source": "涨停接力",
+          "reason": "1板 · 11:18:57封板 · 未炸板 · 换手+17.33%",
+          "temper": 93
+        },
+        {
+          "rank": 30,
+          "code": "603236",
+          "name": "移远通信",
+          "probability": 91,
+          "source": "涨停接力",
+          "reason": "1板 · 09:47:45封板 · 炸板1次 · 换手+2.19%",
+          "temper": 70
+        }
+      ]
+    },
+    {
       "date": "2026-06-29",
       "targetDate": "2026-06-30",
       "savedAt": "2026-06-29T15:30:35.787Z",
-      "status": "pending",
+      "status": "settled",
       "modelVersion": "local-limit-v1",
       "settings": {
         "minScore": 72,
@@ -286,6 +575,49 @@
           "source": "涨停接力",
           "reason": "1板 · 09:32:21封板 · 未炸板 · 换手+3.41%",
           "temper": 81
+        }
+      ],
+      "settledAt": "2026-06-30T03:58:07.011Z",
+      "actualLimitCount": 90,
+      "top5": {
+        "total": 5,
+        "hits": 2,
+        "rate": 40
+      },
+      "top10": {
+        "total": 10,
+        "hits": 2,
+        "rate": 20
+      },
+      "all": {
+        "total": 30,
+        "hits": 4,
+        "rate": 13.3
+      },
+      "hits": [
+        {
+          "code": "002407",
+          "name": "多氟多",
+          "rank": 1,
+          "probability": 99
+        },
+        {
+          "code": "003043",
+          "name": "华亚智能",
+          "rank": 5,
+          "probability": 99
+        },
+        {
+          "code": "603928",
+          "name": "兴业股份",
+          "rank": 15,
+          "probability": 94
+        },
+        {
+          "code": "600363",
+          "name": "联创光电",
+          "rank": 19,
+          "probability": 92
         }
       ]
     },
