@@ -12,6 +12,7 @@ const predictionHistoryFile = join(dataDir, "prediction-history.json");
 const highOpenHistoryFile = join(dataDir, "high-open-history.json");
 const port = Number(process.env.PORT || 3788);
 const execFileAsync = promisify(execFile);
+const curlCommand = process.platform === "win32" ? "curl.exe" : "curl";
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
@@ -65,7 +66,7 @@ async function fetchJson(url) {
       lastError = error;
     }
     try {
-      const { stdout } = await execFileAsync("curl.exe", [
+      const { stdout } = await execFileAsync(curlCommand, [
         "--noproxy",
         "*",
         "-s",
