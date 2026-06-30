@@ -210,8 +210,12 @@
             <div id="quoteMetrics" class="metric-grid"></div>
             <div class="kline-box">
               <div class="panel-head slim">
-                <h3>K线与日线数据</h3>
-                <button id="reloadKline" class="ghost-button" type="button">刷新K线</button>
+                <h3>K线数据</h3>
+                <div class="kline-period-tabs">
+                  <button class="ghost-button active" type="button" data-kline-period="day">日K</button>
+                  <button class="ghost-button" type="button" data-kline-period="week">周K</button>
+                  <button id="reloadKline" class="ghost-button" type="button">刷新K线</button>
+                </div>
               </div>
               <canvas id="klineCanvas" width="880" height="320"></canvas>
               <div class="table-wrap kline-table-wrap">

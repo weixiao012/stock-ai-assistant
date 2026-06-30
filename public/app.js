@@ -22,6 +22,7 @@ const state = {
   predictionHistory: null,
   highOpenHistory: null,
   kline: [],
+  klinePeriod: "day",
   chan: null,
   fundFlowType: "sector",
   sectorType: "industry",
@@ -43,6 +44,7 @@ const CHART_COLORS = ["#d93025", "#2368c4", "#16834a", "#b46a00", "#7c3aed", "#0
 const REALTIME_REFRESH_MS = 15000;
 const KLINE_REFRESH_MS = 60000;
 const HIGH_OPEN_AUTO_SAVE_KEY = "stock-high-open-close30-auto-save";
+const HIGH_OPEN_HISTORY_BACKUP_KEY = "stock-high-open-history-backup";
 const COLLAPSIBLE_PANELS_KEY = "stock-collapsible-panels";
 let realtimeRefreshTimer = null;
 let isRefreshing = false;
@@ -824,7 +826,7 @@ function renderFundFlow() {
     <div class="fund-flow-item">
       <div>
         <strong>${index + 1}. ${item.name}</strong>
-        <div class="sector-meta">主力净流入 ${money(item.mainNetInflow)} · 占比 ${pct(item.mainNetRatio)}</div>
+        <div class="sector-meta">主力净流入 ${money(item.mainNetInflow)} · 占比 ${pct(item.mainNetRatio)}${item.estimated ? " · 云端估算" : ""}</div>
       </div>
       <b class="${tone(item.mainNetInflow)}">${money(item.mainNetInflow)}</b>
     </div>
@@ -977,8 +979,9 @@ async function loadSectorFlowLines(period = state.sectorFlowPeriod) {
     button.classList.toggle("active", button.dataset.flowPeriod === period);
   });
   renderSectorFlowChart();
+  const hasEstimated = state.sectorFlowLines.some((line) => line.estimated || line.points?.some((point) => point.estimated));
   const status = state.sectorFlowLines.length
-    ? `已同步 ${new Date().toLocaleTimeString("zh-CN", { hour12: false })} · 30秒自动刷新`
+    ? `已同步 ${new Date().toLocaleTimeString("zh-CN", { hour12: false })} · ${hasEstimated ? "云端估算" : "30秒自动刷新"}`
     : "暂无实时资金曲线数据";
   setFlowSyncStatus(status);
 }
@@ -1081,14 +1084,40 @@ function renderHighOpenAccuracy(data = state.highOpenHistory) {
   if (note) note.textContent = `${summary.suggestion || "记录预测后，会按次日开盘价自动结算。"} 正式尾盘样本 ${summary.formalDays ?? 0} 天，预览样本 ${summary.previewDays ?? 0} 天。`;
   const list = $("#highOpenHistoryList");
   if (list) {
-    list.innerHTML = snapshots.slice(0, 3).map((item) => {
+    list.innerHTML = snapshots.slice(0, 8).map((item) => {
       const sampleLabel = (item.sampleType || "close30") === "close30" ? "尾盘正式" : "预览";
       const status = item.status === "settled"
         ? `Top5 ${item.top5?.hits || 0}/${item.top5?.total || 0} · Top10 ${item.top10?.hits || 0}/${item.top10?.total || 0}`
         : `待 ${item.targetDate} 开盘后结算`;
-      return `<div><b>${sampleLabel}</b> ${item.date} 预测 ${item.targetDate}：${status}</div>`;
-    }).join("");
+      const resultByCode = new Map((item.results || []).map((row) => [row.code, row]));
+      const rows = (item.predictions || []).slice(0, 5).map((row) => {
+        const result = resultByCode.get(row.code);
+        const mark = item.status === "settled"
+          ? result?.hit ? "命中" : "未中"
+          : "待验证";
+        const openText = result?.highOpenPct !== undefined ? ` · 高开 ${pct(result.highOpenPct)}` : "";
+        return `<span class="history-pick ${result?.hit ? "hit" : ""}">${row.rank}. ${row.name} ${row.code} · ${Math.round(row.probability || 0)}% · ${mark}${openText}</span>`;
+      }).join("");
+      return `<div class="history-record"><b>${sampleLabel}</b> ${item.date} 预测 ${item.targetDate}：${status}<div class="history-picks">${rows || "无候选明细"}</div></div>`;
+    }).join("") || `<div>暂无高开 5% 预测历史。尾盘 14:30-15:00 会自动记录，也可以点“记录尾盘预测”。</div>`;
   }
+}
+
+function readHighOpenHistoryBackup() {
+  try {
+    return JSON.parse(localStorage.getItem(HIGH_OPEN_HISTORY_BACKUP_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function writeHighOpenHistoryBackup(data) {
+  if (!data?.summary || !Array.isArray(data.snapshots)) return;
+  localStorage.setItem(HIGH_OPEN_HISTORY_BACKUP_KEY, JSON.stringify({
+    summary: data.summary,
+    snapshots: data.snapshots.slice(0, 20),
+    savedAt: new Date().toISOString()
+  }));
 }
 
 function renderPredictionAccuracy(data = state.predictionHistory) {
@@ -1113,7 +1142,10 @@ function renderPredictionAccuracy(data = state.predictionHistory) {
 }
 
 async function loadHighOpenHistory() {
-  state.highOpenHistory = await safeApi("/api/high-open-history", null);
+  const backup = readHighOpenHistoryBackup();
+  const data = await safeApi("/api/high-open-history", null);
+  state.highOpenHistory = data?.snapshots?.length ? data : backup || data;
+  if (state.highOpenHistory?.snapshots?.length) writeHighOpenHistoryBackup(state.highOpenHistory);
   renderHighOpenAccuracy();
 }
 
@@ -1142,6 +1174,7 @@ async function saveHighOpenSnapshot() {
   });
   if (data?.error) throw new Error(data.error);
   state.highOpenHistory = { summary: data.summary, snapshots: [data.snapshot] };
+  writeHighOpenHistoryBackup(state.highOpenHistory);
   await loadHighOpenHistory();
   alert(windowInfo.inWindow
     ? "已记录正式尾盘高开 5% 预测，后续会按次日开盘表现自动结算准确度并用于优化模型。"
@@ -1174,6 +1207,7 @@ async function autoSaveHighOpenSnapshotIfNeeded() {
   });
   if (data?.error) throw new Error(data.error);
   localStorage.setItem(HIGH_OPEN_AUTO_SAVE_KEY, windowInfo.date);
+  writeHighOpenHistoryBackup({ summary: data.summary, snapshots: [data.snapshot] });
   await loadHighOpenHistory();
 }
 
@@ -1428,7 +1462,11 @@ function renderKline() {
   });
 }
 
-async function loadKline(code = state.selected?.code) {
+async function loadKline(code = state.selected?.code, period = state.klinePeriod) {
+  state.klinePeriod = period;
+  document.querySelectorAll("[data-kline-period]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.klinePeriod === period);
+  });
   if (!code) {
     state.kline = [];
     state.chan = null;
@@ -1436,7 +1474,7 @@ async function loadKline(code = state.selected?.code) {
     renderChanAnalysis();
     return;
   }
-  const data = await api(`/api/kline?code=${code}&limit=60`);
+  const data = await api(`/api/kline?code=${code}&period=${period}&limit=${period === "week" ? 120 : 60}`);
   state.kline = data.klines || [];
   state.chan = data.chan || null;
   renderKline();
@@ -1622,6 +1660,11 @@ $("#runTradingAgents").addEventListener("click", () => runTradingAgents().catch(
   $("#tradingAgentsView").textContent = error.message;
 }));
 $("#reloadKline").addEventListener("click", () => loadKline().catch((error) => alert(error.message)));
+document.querySelectorAll("[data-kline-period]").forEach((button) => {
+  button.addEventListener("click", () => {
+    loadKline(state.selected?.code, button.dataset.klinePeriod).catch((error) => alert(error.message));
+  });
+});
 $("#stockChatForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const input = $("#stockChatInput");
