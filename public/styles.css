@@ -252,6 +252,94 @@ textarea {
   align-items: start;
 }
 
+.prediction-notes-panel {
+  padding-bottom: 14px;
+}
+
+.prediction-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.prediction-note-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.prediction-note-card.muted {
+  color: var(--muted);
+}
+
+.prediction-note-top,
+.prediction-note-meta,
+.prediction-note-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.prediction-note-top,
+.prediction-note-actions {
+  justify-content: space-between;
+}
+
+.prediction-note-title {
+  min-width: 0;
+}
+
+.prediction-note-title strong,
+.prediction-note-title span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prediction-note-title span,
+.prediction-note-meta,
+.prediction-note-foot {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.prediction-note-meta {
+  flex-wrap: wrap;
+}
+
+.prediction-note-meta b {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.prediction-note-badge {
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.prediction-note-badge.hot {
+  border-color: rgba(217, 48, 37, 0.25);
+  background: rgba(217, 48, 37, 0.08);
+  color: var(--red);
+}
+
+.prediction-note-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
 .first-board-panel {
   grid-area: first;
 }
@@ -1377,6 +1465,10 @@ tr:last-child td {
     text-align: left;
   }
 
+  .prediction-notes {
+    grid-template-columns: 1fr;
+  }
+
   .rush-dashboard {
     grid-template-columns: 1fr;
   }
@@ -1442,6 +1534,16 @@ tr:last-child td {
 
   .panel-actions {
     justify-content: stretch;
+    width: 100%;
+  }
+
+  .prediction-note-top,
+  .prediction-note-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .prediction-note-actions button {
     width: 100%;
   }
 

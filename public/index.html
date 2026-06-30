@@ -322,8 +322,20 @@
           </article>
         </section>
 
+        <section class="panel prediction-notes-panel">
+          <div class="panel-head">
+            <div>
+              <h2>预测便签</h2>
+              <p class="panel-subtitle">集中收纳各个预测板块，先看摘要，再展开明细</p>
+            </div>
+          </div>
+          <div id="predictionNotes" class="prediction-notes">
+            <div class="prediction-note-card muted">等待预测数据</div>
+          </div>
+        </section>
+
         <section class="board-grid market-board">
-          <article class="panel table-panel first-board-panel">
+          <article id="firstBoardPanel" class="panel table-panel first-board-panel">
             <div class="panel-head">
               <div>
                 <h2>冲高5%预测</h2>
@@ -386,7 +398,7 @@
             </div>
           </article>
 
-          <article class="panel table-panel limit-panel">
+          <article id="limitPredictionPanel" class="panel table-panel limit-panel">
             <div class="panel-head">
               <div>
                 <h2>明日涨停预测榜</h2>

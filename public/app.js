@@ -791,6 +791,7 @@ function renderCollapsiblePanels() {
       button.setAttribute("aria-expanded", collapsed ? "false" : "true");
     }
   });
+  renderPredictionNotes();
 }
 
 function initCollapsiblePanels() {
@@ -1041,6 +1042,7 @@ function renderPredictions() {
       </tr>
     `;
     renderAiPicks(rows);
+    renderPredictionNotes();
     return;
   }
   $("#predictionTable").innerHTML = rows.map((item) => `
@@ -1054,6 +1056,7 @@ function renderPredictions() {
     </tr>
   `).join("");
   renderAiPicks(rows);
+  renderPredictionNotes();
 }
 
 function renderFirstBoard() {
@@ -1068,6 +1071,7 @@ function renderFirstBoard() {
         <td colspan="5">当前没有达到冲高 5% 模型阈值的候选。当前筛选：${filterText}。优先等待未涨停强势股、量能和板块资金形成共振。</td>
       </tr>
     `;
+    renderPredictionNotes();
     return;
   }
   table.innerHTML = rows.map((item) => `
@@ -1078,6 +1082,82 @@ function renderFirstBoard() {
       <td>${factorSummary(item)}<br><span class="sector-meta">股性 ${item.temper} · 板块 ${item.industry || "--"}</span></td>
       <td class="plan-cell">${item.risk}<span class="rush-condition">${firstBoardConditionPlan(item)}</span><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 前一天未涨停 次日盘中冲高5%以上 主力资金 人气排名`)}">同花顺验证</a></td>
     </tr>
+  `).join("");
+  renderPredictionNotes();
+}
+
+function predictionPanelCollapsed(panelId) {
+  const panel = $(panelId);
+  if (!panel) return false;
+  const key = panel.dataset.collapseKey || panelCollapseKey(panel, 0);
+  return Boolean(state.collapsedPanels[key]);
+}
+
+function predictionSampleText(data) {
+  const summary = data?.summary;
+  if (!summary) return "样本 --";
+  if (summary.pendingDays) return `样本 ${summary.settledDays || 0}/${summary.pendingDays}天`;
+  return `样本 ${summary.settledDays || 0}天`;
+}
+
+function predictionRateText(data, field = "top5") {
+  const rate = data?.summary?.[field]?.rate;
+  return Number.isFinite(Number(rate)) ? `${rate}%` : "--";
+}
+
+function renderPredictionNotes() {
+  const box = $("#predictionNotes");
+  if (!box) return;
+  const rushRows = buildFirstBoardCandidates();
+  const limitRows = buildPredictions();
+  const rushTop = rushRows[0];
+  const limitTop = limitRows[0];
+  const rushCollapsed = predictionPanelCollapsed("#firstBoardPanel");
+  const limitCollapsed = predictionPanelCollapsed("#limitPredictionPanel");
+  const cards = [
+    {
+      id: "firstBoardPanel",
+      title: "冲高5%预测",
+      sub: rushTop ? `${rushTop.name} ${rushTop.code}` : "暂无候选",
+      score: rushTop ? `${rushTop.firstBoardProbability}%` : "--",
+      scoreLabel: "冲高概率",
+      rate: predictionRateText(state.highOpenHistory),
+      sample: predictionSampleText(state.highOpenHistory),
+      foot: "尾盘30分钟样本，次日盘中最高价验证",
+      collapsed: rushCollapsed
+    },
+    {
+      id: "limitPredictionPanel",
+      title: "明日涨停预测",
+      sub: limitTop ? `${limitTop.name} ${limitTop.code}` : "暂无候选",
+      score: limitTop ? `${limitTop.probability}%` : "--",
+      scoreLabel: "预测概率",
+      rate: predictionRateText(state.predictionHistory),
+      sample: predictionSampleText(state.predictionHistory),
+      foot: "按次日实际涨停池结算准确率",
+      collapsed: limitCollapsed
+    }
+  ];
+
+  box.innerHTML = cards.map((item) => `
+    <div class="prediction-note-card">
+      <div class="prediction-note-top">
+        <div class="prediction-note-title">
+          <strong>${item.title}</strong>
+          <span>${item.sub}</span>
+        </div>
+        <span class="prediction-note-badge ${Number.parseFloat(item.score) >= 75 ? "hot" : ""}">${item.scoreLabel} ${item.score}</span>
+      </div>
+      <div class="prediction-note-meta">
+        <span>Top5命中 <b>${item.rate}</b></span>
+        <span>${item.sample}</span>
+        <span>${item.collapsed ? "已收纳" : "已展开"}</span>
+      </div>
+      <div class="prediction-note-actions">
+        <span class="prediction-note-foot">${item.foot}</span>
+        <button class="ghost-button" type="button" data-prediction-target="${item.id}">${item.collapsed ? "展开明细" : "收起明细"}</button>
+      </div>
+    </div>
   `).join("");
 }
 
@@ -1111,6 +1191,7 @@ function renderHighOpenAccuracy(data = state.highOpenHistory) {
       return `<div class="history-record"><b>${sampleLabel}</b> ${item.date} 预测 ${item.targetDate}：${status}<div class="history-picks">${rows || "无候选明细"}</div></div>`;
     }).join("") || `<div>暂无冲高 5% 预测历史。尾盘 14:30-15:00 会自动记录，也可以点“记录尾盘预测”。</div>`;
   }
+  renderPredictionNotes();
 }
 
 function readHighOpenHistoryBackup() {
@@ -1149,6 +1230,7 @@ function renderPredictionAccuracy(data = state.predictionHistory) {
       return `<div>${item.date} 预测 ${item.targetDate}：${status}</div>`;
     }).join("");
   }
+  renderPredictionNotes();
 }
 
 async function loadHighOpenHistory() {
@@ -1655,6 +1737,18 @@ $("#resetHighOpenFilter")?.addEventListener("click", () => {
   localStorage.setItem("stock-high-open-filter", JSON.stringify(state.highOpenFilter));
   syncHighOpenFilter();
   renderFirstBoard();
+});
+$("#predictionNotes")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-prediction-target]");
+  if (!button) return;
+  const panel = document.getElementById(button.dataset.predictionTarget);
+  if (!panel) return;
+  const key = panel.dataset.collapseKey || panelCollapseKey(panel, 0);
+  const nextCollapsed = !state.collapsedPanels[key];
+  state.collapsedPanels[key] = nextCollapsed;
+  saveCollapsedPanels();
+  renderCollapsiblePanels();
+  if (!nextCollapsed) panel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 $("#savePredictionSnapshot").addEventListener("click", () => savePredictionSnapshot().catch((error) => alert(error.message)));
 $("#refreshPredictionHistory").addEventListener("click", () => loadPredictionHistory().catch((error) => alert(error.message)));
