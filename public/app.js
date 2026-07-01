@@ -14,6 +14,7 @@ const state = {
   indices: [],
   sectors: [],
   limitUp: [],
+  overnightCandidates: [],
   movers: [],
   activeStocks: [],
   fundFlow: [],
@@ -21,13 +22,13 @@ const state = {
   sectorFlowPeriod: "day",
   predictionHistory: null,
   highOpenHistory: null,
+  overnightHistory: null,
   kline: [],
   klinePeriod: "day",
   chan: null,
   fundFlowType: "sector",
   sectorType: "industry",
-  sectorPanelCollapsed: localStorage.getItem("stock-sector-panel-collapsed") === "1",
-  stockWorkspaceCollapsed: localStorage.getItem("stock-workspace-collapsed") === "1",
+  activePredictionSidebar: localStorage.getItem("stock-active-prediction-sidebar") || "highOpen",
   collapsedPanels: JSON.parse(localStorage.getItem("stock-collapsible-panels") || "{}"),
   marketBias: JSON.parse(localStorage.getItem("stock-market-bias") || '{"text":"","themes":[],"tone":0}'),
   highOpenFilter: JSON.parse(localStorage.getItem("stock-high-open-filter") || '{"minPrice":"","maxPrice":""}'),
@@ -47,6 +48,9 @@ const KLINE_REFRESH_MS = 60000;
 const HIGH_OPEN_AUTO_SAVE_KEY = "stock-high-open-close30-auto-save";
 const HIGH_OPEN_HISTORY_BACKUP_KEY = "stock-high-open-history-backup";
 const COLLAPSIBLE_PANELS_KEY = "stock-collapsible-panels";
+const LOCAL_API_ORIGIN = "http://localhost:3788";
+const API_BASE = window.location.protocol === "file:" ? LOCAL_API_ORIGIN : "";
+const THS_KLINE_PREFIX = "stock-ths-kline-";
 let realtimeRefreshTimer = null;
 let isRefreshing = false;
 let lastKlineRefreshAt = 0;
@@ -172,14 +176,16 @@ function highOpenWindowInfo(now = new Date()) {
   const start = 14 * 60 + 30;
   const end = 15 * 60;
   const inWindow = isTradingDay && minutes >= start && minutes <= end;
-  let label = "非尾盘窗口：当前只做预览，正式样本在交易日 14:30-15:00 记录。";
-  if (!isTradingDay) label = "非交易日：当前只做预览，不计入正式尾盘样本。";
-  else if (minutes < start) label = "等待尾盘窗口：14:30-15:00 自动给出并记录正式预测样本。";
-  else if (minutes > end) label = "尾盘窗口已过：当前记录会标为预览样本，正式样本请在 14:30-15:00 保存。";
+  const canPredict = isTradingDay && minutes >= start;
+  let label = "非尾盘窗口：当前不生成冲高5%候选，正式预测只在交易日 14:30 后开启。";
+  if (!isTradingDay) label = "非交易日：不生成冲高5%候选，等待下个交易日 14:30 后预测。";
+  else if (minutes < start) label = "等待尾盘窗口：14:30 前不做冲高5%预测，避免早盘/午盘噪音干扰。";
+  else if (minutes > end) label = "尾盘窗口已过：可以查看 14:30 后形成的候选，正式样本优先在 14:30-15:00 保存。";
   else label = "正在尾盘预测窗口：当前记录将作为正式尾盘样本，用于后续优化模型。";
   return {
     ...clock,
     inWindow,
+    canPredict,
     sampleType: inWindow ? "close30" : "preview",
     modelVersion: inWindow ? "high-rush-close30-v5" : "high-rush-preview-v5",
     label
@@ -194,7 +200,7 @@ function tone(value) {
 }
 
 async function api(path, options) {
-  const response = await fetch(path, options);
+  const response = await fetch(`${API_BASE}${path}`, options);
   const data = await response.json();
   if (!response.ok || data?.error) {
     throw new Error(data?.error || "数据读取失败");
@@ -207,6 +213,9 @@ async function safeApi(path, fallback = []) {
     return await api(path);
   } catch (error) {
     console.warn(`接口读取失败：${path}`, error);
+    if (API_BASE && $("#updatedAt")) {
+      $("#updatedAt").textContent = `本地服务未连接：请先运行 npm start，再刷新页面`;
+    }
     return fallback;
   }
 }
@@ -525,6 +534,70 @@ function buildFirstBoardCandidates() {
   return diversified.slice(0, 3);
 }
 
+function overnightModelNote(item) {
+  const factors = Array.isArray(item.factors) ? item.factors : [];
+  const cap = safeNumber(item.marketCap || item.floatMarketCap);
+  const capText = cap ? `${fmt.format(cap / 100000000)}亿` : "--";
+  const avgText = item.aboveAverageStatus === "confirmed"
+    ? `分时均价线上 ${fmt.format(item.aboveAverageRatio || 0)}%`
+    : "分时均价线待核验";
+  return [
+    `涨幅${pct(item.changePct)}`,
+    `近月涨停${item.lastLimitDate || "--"}`,
+    `市值${capText}`,
+    `量比${fmt.format(safeNumber(item.volumeRatio))}`,
+    `换手${pct(item.turnover)}`,
+    avgText,
+    ...factors.slice(0, 2)
+  ].filter(Boolean).join(" · ");
+}
+
+function overnightRiskPlan(item) {
+  const price = safeNumber(item.price);
+  const stop = price ? fmt.format(price * 0.97) : "--";
+  const take = price ? fmt.format(price * 1.03) : "--";
+  const sampleDays = safeNumber(state.overnightHistory?.summary?.settledDays);
+  const sampleText = sampleDays >= 5
+    ? `历史Top5 ${state.overnightHistory.summary.top5.rate}%`
+    : `样本不足(${sampleDays}天)`;
+  return `次日高开过多不追；跌破昨收或参考止损 ${stop} 放弃；冲到 ${take} 附近优先验证弹性。${sampleText}，先记录复盘，不自动买入。`;
+}
+
+function renderOvernightTradeGate(rows = state.overnightCandidates || []) {
+  const summary = state.overnightHistory?.summary;
+  const top = rows[0];
+  const gate = tradeGateLevel(summary, safeNumber(top?.overnightProbability ?? top?.probability));
+  const candidateText = top
+    ? `当前头部 ${top.name} ${top.code}，评分 ${top.overnightProbability ?? top.probability}，次日以高点+3%且回撤不破-3%验证。`
+    : "当前没有达标候选，宁可不记录。";
+  setStrategyGate("#overnightTradeGate", gate, `${gate.reason}；${candidateText} 隔夜模型必须持续积累样本后再提高执行权重。`);
+}
+
+function renderOvernightCandidates() {
+  const rows = state.overnightCandidates || [];
+  const table = $("#overnightTable");
+  if (!table) return;
+  if (!rows.length) {
+    table.innerHTML = `
+      <tr>
+        <td colspan="5">当前没有满足一夜持股条件的候选。硬条件：14:30后涨幅3%-5%、近月涨停、市值≤200亿、量比>1、换手5%-10%、分时在均价线上。</td>
+      </tr>
+    `;
+    renderOvernightTradeGate(rows);
+    return;
+  }
+  table.innerHTML = rows.map((item) => `
+    <tr data-code="${item.code}">
+      <td><button class="stock-link" type="button" data-code="${item.code}">${item.name}</button><br><span>${item.code}</span></td>
+      <td><b class="${safeNumber(item.overnightProbability ?? item.probability) >= 80 ? "red" : "amber"}">${item.overnightProbability ?? item.probability}</b><br><span class="sector-meta">${item.source || "一夜持候选"}</span></td>
+      <td>${overnightModelNote(item)}</td>
+      <td>${item.reason || "--"}<br><span class="sector-meta">收盘强度、近月高位、成交额、市值弹性用于排序</span></td>
+      <td class="plan-cell">${item.risk || "隔夜风险需次日竞价二次确认"}<span class="rush-condition">${overnightRiskPlan(item)}</span><a target="_blank" rel="noreferrer" href="https://www.iwencai.com/unifiedwap/result?w=${encodeURIComponent(`${item.name} ${item.code} 近一个月涨停 市值小于200亿 量比大于1 换手率5到10 分时均价线以上`)}">同花顺验证</a></td>
+    </tr>
+  `).join("");
+  renderOvernightTradeGate(rows);
+}
+
 function tradeGateLevel(summary, topScore) {
   const settledDays = safeNumber(summary?.settledDays);
   const top5Rate = safeNumber(summary?.top5?.rate);
@@ -543,7 +616,10 @@ function setStrategyGate(selector, gate, message) {
   el.innerHTML = `<strong>${gate.action}</strong>：${message}`;
 }
 
-function renderHighOpenTradeGate(rows = buildFirstBoardCandidates()) {
+function renderHighOpenTradeGate(rows = null) {
+  if (!Array.isArray(rows)) {
+    rows = highOpenWindowInfo().canPredict ? buildFirstBoardCandidates() : [];
+  }
   const summary = state.highOpenHistory?.summary;
   const top = rows[0];
   const gate = tradeGateLevel(summary, safeNumber(top?.firstBoardProbability));
@@ -601,8 +677,9 @@ function renderHighOpenWindowStatus() {
   box.classList.toggle("active", info.inWindow);
   box.classList.toggle("waiting", !info.inWindow);
   if (saveButton) {
-    saveButton.textContent = info.inWindow ? "记录正式尾盘预测" : "记录预览预测";
-    saveButton.title = info.inWindow ? "保存为正式尾盘样本" : "非尾盘窗口保存为预览样本，不作为正式尾盘模型样本";
+    saveButton.disabled = !info.canPredict;
+    saveButton.textContent = info.inWindow ? "记录正式尾盘预测" : info.canPredict ? "记录尾盘后预览" : "14:30后可记录";
+    saveButton.title = info.canPredict ? "保存14:30后形成的冲高5%预测样本" : "14:30前不生成冲高5%候选，也不保存预览样本";
   }
   return info;
 }
@@ -637,7 +714,9 @@ function marketMoodScore() {
 }
 
 function renderIndices() {
-  $("#indexGrid").innerHTML = state.indices.map((item) => `
+  const box = $("#indexGrid");
+  if (!box) return;
+  box.innerHTML = state.indices.map((item) => `
     <div class="mini-item">
       <strong>${item.name}</strong>
       <b class="${tone(item.changePct)}">${pct(item.changePct)}</b>
@@ -648,7 +727,9 @@ function renderIndices() {
 }
 
 function renderWatch() {
-  $("#watchList").innerHTML = state.watch.map((code) => `
+  const box = $("#watchList");
+  if (!box) return;
+  box.innerHTML = state.watch.map((code) => `
     <button type="button" data-code="${code}">
       <strong>${code}</strong>
       <span>点击分析</span>
@@ -831,7 +912,9 @@ function renderSectors() {
       ? state.sectors.slice(0, 3).map((item) => `${item.name} ${pct(item.changePct)}`).join(" · ")
       : "等待板块数据";
   }
-  $("#sectorList").innerHTML = state.sectors.slice(0, 16).map((item, index) => `
+  const list = $("#sectorList");
+  if (!list) return;
+  list.innerHTML = state.sectors.slice(0, 16).map((item, index) => `
     <div class="sector-item">
       <div>
         <strong>${index + 1}. ${item.name}</strong>
@@ -842,31 +925,35 @@ function renderSectors() {
   `).join("");
 }
 
-function renderSectorPanelState() {
-  const panel = $("#sectorPanel");
-  const button = $("#toggleSectorPanel");
-  if (!panel || !button) return;
-  panel.classList.toggle("collapsed", state.sectorPanelCollapsed);
-  button.textContent = state.sectorPanelCollapsed ? "展开" : "收起";
+function renderMarketSidebarState() {
+  const active = state.activePredictionSidebar || "";
+  document.querySelectorAll("[data-sidebar-panel]").forEach((panel) => {
+    const isActive = panel.dataset.sidebarPanel === active;
+    panel.classList.toggle("is-closed", !isActive);
+    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+  });
+  document.querySelectorAll("[data-sidebar-open]").forEach((button) => {
+    const isActive = button.dataset.sidebarOpen === active;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-expanded", isActive ? "true" : "false");
+  });
 }
 
-function renderStockWorkspaceState() {
-  const shell = $("#appShell");
-  if (!shell) return;
-  shell.classList.toggle("stock-workspace-collapsed", state.stockWorkspaceCollapsed);
-  const text = state.stockWorkspaceCollapsed ? "打开个股/K线" : "收起个股/K线";
-  const topButton = $("#toggleStockWorkspace");
-  const closeButton = $("#closeStockWorkspace");
-  const railButton = $("#openStockWorkspaceRail");
-  if (topButton) topButton.textContent = text;
-  if (closeButton) closeButton.textContent = "收起";
-  if (railButton) railButton.textContent = state.selected ? `${state.selected.name || state.selected.code} / K线` : "个股/K线";
+function openPredictionSidebar(name) {
+  if (state.activePredictionSidebar === name) {
+    closePredictionSidebar(name);
+    return;
+  }
+  state.activePredictionSidebar = name;
+  localStorage.setItem("stock-active-prediction-sidebar", name);
+  renderMarketSidebarState();
 }
 
-function setStockWorkspaceCollapsed(collapsed) {
-  state.stockWorkspaceCollapsed = collapsed;
-  localStorage.setItem("stock-workspace-collapsed", collapsed ? "1" : "0");
-  renderStockWorkspaceState();
+function closePredictionSidebar(name) {
+  if (state.activePredictionSidebar !== name) return;
+  state.activePredictionSidebar = "";
+  localStorage.setItem("stock-active-prediction-sidebar", "");
+  renderMarketSidebarState();
 }
 
 function panelCollapseKey(panel, index) {
@@ -897,7 +984,7 @@ function renderCollapsiblePanels() {
 
 function initCollapsiblePanels() {
   document.querySelectorAll(".panel").forEach((panel, index) => {
-    if (panel.id === "sectorPanel") return;
+    if (panel.closest("[data-sidebar-panel]")) return;
     const head = panel.querySelector(":scope > .panel-head");
     if (!head) return;
     const key = panelCollapseKey(panel, index);
@@ -953,6 +1040,21 @@ function formatFlowTime(value) {
   const text = String(value || "");
   if (state.sectorFlowPeriod === "day") return text.includes(" ") ? text.split(" ").at(-1).slice(0, 5) : text.slice(-5);
   return text.slice(5);
+}
+
+function formatIntradayAxisTime(index, total) {
+  const startMinutes = 9 * 60 + 15;
+  const endMinutes = 15 * 60;
+  const ratio = total <= 1 ? 0 : Math.max(0, Math.min(1, index / (total - 1)));
+  const minutes = Math.round(startMinutes + (endMinutes - startMinutes) * ratio);
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function flowAxisLabel(point, index, total) {
+  if (state.sectorFlowPeriod === "day") return formatIntradayAxisTime(index, total);
+  return formatFlowTime(point?.time);
 }
 
 function renderSectorFlowChart() {
@@ -1038,11 +1140,11 @@ function renderSectorFlowChart() {
 
   const firstPoints = series[0]?.points || [];
   if (firstPoints.length) {
-    const mid = firstPoints[Math.floor(firstPoints.length / 2)];
+    const midIndex = Math.floor(firstPoints.length / 2);
     ctx.fillStyle = "#66727f";
-    ctx.fillText(formatFlowTime(firstPoints[0].time), padding.left, height - 12);
-    ctx.fillText(formatFlowTime(mid.time), padding.left + plotW / 2 - 18, height - 12);
-    ctx.fillText(formatFlowTime(firstPoints.at(-1).time), width - padding.right - 48, height - 12);
+    ctx.fillText(flowAxisLabel(firstPoints[0], 0, firstPoints.length), padding.left, height - 12);
+    ctx.fillText(flowAxisLabel(firstPoints[midIndex], midIndex, firstPoints.length), padding.left + plotW / 2 - 18, height - 12);
+    ctx.fillText(flowAxisLabel(firstPoints.at(-1), firstPoints.length - 1, firstPoints.length), width - padding.right - 48, height - 12);
   }
 
   legend.innerHTML = series.map((item, index) => {
@@ -1064,14 +1166,14 @@ function showSectorFlowTooltip(event) {
   const plotW = Math.max(1, rect.width - paddingLeft - paddingRight);
   const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left - paddingLeft) / plotW));
   const index = Math.round(ratio * (firstPoints.length - 1));
-  const time = firstPoints[index]?.time || "--";
+  const time = flowAxisLabel(firstPoints[index], index, firstPoints.length);
   const rows = series.slice(0, 8).map((item, seriesIndex) => {
     const points = item.points || [];
     const point = points[Math.min(index, points.length - 1)];
     const color = CHART_COLORS[seriesIndex % CHART_COLORS.length];
     return `<div><i style="display:inline-block;width:10px;height:3px;background:${color};margin-right:6px"></i>${item.name}: ${money(point?.main)}</div>`;
   }).join("");
-  tooltip.innerHTML = `<strong>${formatFlowTime(time)}</strong>${rows}`;
+  tooltip.innerHTML = `<strong>${time}</strong>${rows}`;
   tooltip.hidden = false;
   tooltip.style.left = `${Math.min(rect.width - 230, Math.max(10, event.clientX - rect.left + 12))}px`;
   tooltip.style.top = `${Math.max(44, event.clientY - rect.top - 10)}px`;
@@ -1189,10 +1291,19 @@ function renderPredictions() {
 }
 
 function renderFirstBoard() {
-  renderHighOpenWindowStatus();
-  const rows = buildFirstBoardCandidates();
+  const windowInfo = renderHighOpenWindowStatus();
   const table = $("#firstBoardTable");
   if (!table) return;
+  if (!windowInfo.canPredict) {
+    table.innerHTML = `
+      <tr>
+        <td colspan="5">14:30 前不生成冲高 5% 预测。这个模型只使用尾盘确定性更高的数据，等 14:30 后再刷新候选。</td>
+      </tr>
+    `;
+    renderHighOpenTradeGate([]);
+    return;
+  }
+  const rows = buildFirstBoardCandidates();
   if (!rows.length) {
     const filterText = $("#highOpenFilterStatus")?.textContent || "价格不限";
     table.innerHTML = `
@@ -1213,6 +1324,14 @@ function renderFirstBoard() {
     </tr>
   `).join("");
   renderHighOpenTradeGate(rows);
+}
+
+function reloadHighOpenBoard() {
+  if (!highOpenWindowInfo().canPredict) {
+    renderFirstBoard();
+    return Promise.resolve();
+  }
+  return refreshRealtimeData();
 }
 
 function renderHighOpenAccuracy(data = state.highOpenHistory) {
@@ -1292,6 +1411,80 @@ function renderPredictionAccuracy(data = state.predictionHistory) {
   renderLimitTradeGate();
 }
 
+function renderOvernightAccuracy(data = state.overnightHistory) {
+  const box = $("#overnightAccuracy");
+  if (!box || !data?.summary) return;
+  const { summary, snapshots = [] } = data;
+  const cards = box.querySelectorAll(".accuracy-card strong");
+  if (cards[0]) cards[0].textContent = `${summary.top5.rate}%`;
+  if (cards[1]) cards[1].textContent = summary.avgHigh ? `${summary.avgHigh}%` : "--";
+  if (cards[2]) cards[2].textContent = summary.pendingDays ? `${summary.settledDays}/${summary.pendingDays}天` : `${summary.settledDays}天`;
+  const note = $("#overnightAccuracyNote");
+  if (note) note.textContent = summary.suggestion || "先连续记录样本，再根据命中率优化模型。";
+  const list = $("#overnightHistoryList");
+  if (list) {
+    list.innerHTML = snapshots.slice(0, 10).map((item) => {
+      const status = item.status === "settled"
+        ? `Top5 ${item.top5?.hits || 0}/${item.top5?.total || 0} · 平均高点${summary.avgHigh || 0}%`
+        : `待 ${item.targetDate} 收盘后结算`;
+      const resultByCode = new Map((item.results || []).map((row) => [row.code, row]));
+      const rows = (item.predictions || []).slice(0, 5).map((row) => {
+        const result = resultByCode.get(row.code);
+        const mark = item.status === "settled" ? result?.hit ? "命中" : "未中" : "待验证";
+        const highText = result?.nextHighPct !== undefined ? ` · 高点${pct(result.nextHighPct)}` : "";
+        const closeText = result?.nextClosePct !== undefined ? ` · 收盘${pct(result.nextClosePct)}` : "";
+        return `<span class="history-pick ${result?.hit ? "hit" : ""}">${row.rank}. ${row.name} ${row.code} · ${Math.round(row.probability || 0)} · ${mark}${highText}${closeText}</span>`;
+      }).join("");
+      return `<div class="history-record"><b>一夜持</b> ${item.date} 预测 ${item.targetDate}：${status}<div class="history-picks">${rows || "无候选明细"}</div></div>`;
+    }).join("") || `<div>暂无一夜持股历史。点击“记录预测”开始建立样本。</div>`;
+  }
+  renderOvernightTradeGate();
+}
+
+async function loadOvernightHistory() {
+  state.overnightHistory = await safeApi("/api/overnight-history", null);
+  renderOvernightAccuracy();
+}
+
+async function loadOvernightCandidates() {
+  state.overnightCandidates = await safeApi("/api/overnight-candidates", []);
+  renderOvernightCandidates();
+  renderOvernightAccuracy();
+}
+
+async function saveOvernightSnapshot() {
+  const rows = state.overnightCandidates?.length ? state.overnightCandidates : await safeApi("/api/overnight-candidates", []);
+  if (!rows.length) {
+    alert("当前没有可记录的一夜持股预测候选。");
+    return;
+  }
+  const data = await api("/api/overnight-history/save", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      predictions: rows,
+      modelVersion: "overnight-tail-v1",
+      predictionWindow: {
+        name: "tail-after-1430",
+        label: "交易日14:30后",
+        savedAt: new Date().toISOString()
+      },
+      settings: {
+        changeRange: "3%-5%",
+        hadLimitInMonth: true,
+        maxMarketCap: 20000000000,
+        minVolumeRatio: 1,
+        turnoverRange: "5%-10%",
+        requireAboveAverageLine: true
+      }
+    })
+  });
+  if (data?.error) throw new Error(data.error);
+  state.overnightHistory = { summary: data.summary, snapshots: [data.snapshot] };
+  await loadOvernightHistory();
+  alert("已记录一夜持股预测样本，后续会按次日高点、收盘和回撤自动结算，用来优化模型。");
+}
+
 async function loadHighOpenHistory() {
   const backup = readHighOpenHistoryBackup();
   const data = await safeApi("/api/high-open-history", null);
@@ -1302,6 +1495,11 @@ async function loadHighOpenHistory() {
 
 async function saveHighOpenSnapshot() {
   const windowInfo = renderHighOpenWindowStatus();
+  if (!windowInfo.canPredict) {
+    alert("冲高 5% 预测只在交易日 14:30 后开启。14:30 前不生成也不保存预测样本。");
+    renderFirstBoard();
+    return;
+  }
   const rows = buildFirstBoardCandidates();
   if (!rows.length) {
     alert("当前没有可记录的冲高 5% 预测候选。");
@@ -1534,6 +1732,129 @@ async function runTradingAgents() {
   renderTradingAgents(data);
 }
 
+function thsKlineStorageKey(code = state.selected?.code || $("#stockInput")?.value) {
+  const clean = String(code || "").replace(/\D/g, "").slice(0, 6);
+  return clean ? `${THS_KLINE_PREFIX}${clean}` : "";
+}
+
+function setKlineImportStatus(text, toneClass = "") {
+  const box = $("#klineImportStatus");
+  if (!box) return;
+  box.textContent = text;
+  box.className = `kline-import-status ${toneClass}`.trim();
+}
+
+function splitThsLine(line) {
+  if (line.includes("\t")) return line.split("\t").map((cell) => cell.trim());
+  return line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""));
+}
+
+function parseThsNumber(value) {
+  const text = String(value ?? "").replace(/,/g, "").replace(/%/g, "").trim();
+  if (!text || text === "--" || text === "-") return 0;
+  const unit = text.endsWith("亿") ? 100000000 : text.endsWith("万") ? 10000 : 1;
+  const parsed = Number(text.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed * unit : 0;
+}
+
+function normalizeThsDate(value) {
+  const text = String(value || "").trim().replaceAll("/", "-").replaceAll(".", "-");
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  const parts = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (parts) return `${parts[1]}-${parts[2].padStart(2, "0")}-${parts[3].padStart(2, "0")}`;
+  return text.slice(0, 10);
+}
+
+function findThsColumn(headers, names, fallbackIndex) {
+  const index = headers.findIndex((header) => names.some((name) => header.includes(name)));
+  return index >= 0 ? index : fallbackIndex;
+}
+
+function parseThsKlineText(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) throw new Error("文件里没有足够的K线数据");
+
+  const headerIndex = lines.findIndex((line) => /日期|时间|开盘|最高|最低|收盘/.test(line));
+  const headers = splitThsLine(lines[Math.max(0, headerIndex)]).map((item) => item.replace(/\s/g, ""));
+  const rows = lines.slice(Math.max(0, headerIndex) + 1).map(splitThsLine);
+  const col = {
+    date: findThsColumn(headers, ["日期", "时间"], 0),
+    open: findThsColumn(headers, ["开盘"], 1),
+    high: findThsColumn(headers, ["最高"], 2),
+    low: findThsColumn(headers, ["最低"], 3),
+    close: findThsColumn(headers, ["收盘", "现价"], 4),
+    volume: findThsColumn(headers, ["成交量", "总手"], 5),
+    amount: findThsColumn(headers, ["成交额", "金额"], 6),
+    changePct: findThsColumn(headers, ["涨跌幅", "涨幅"], 8),
+    turnover: findThsColumn(headers, ["换手"], 9)
+  };
+
+  return rows.map((cells) => {
+    const open = parseThsNumber(cells[col.open]);
+    const close = parseThsNumber(cells[col.close]);
+    const high = parseThsNumber(cells[col.high]);
+    const low = parseThsNumber(cells[col.low]);
+    const previous = open || close || 1;
+    return {
+      date: normalizeThsDate(cells[col.date]),
+      open,
+      close,
+      high,
+      low,
+      volume: parseThsNumber(cells[col.volume]),
+      amount: parseThsNumber(cells[col.amount]),
+      amplitude: previous ? ((high - low) / previous) * 100 : 0,
+      changePct: parseThsNumber(cells[col.changePct]),
+      change: close - open,
+      turnover: parseThsNumber(cells[col.turnover]),
+      source: "ths"
+    };
+  }).filter((row) => row.date && row.open && row.close && row.high && row.low)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function readImportedKline(code = state.selected?.code) {
+  const key = thsKlineStorageKey(code);
+  if (!key) return [];
+  try {
+    const rows = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+async function readFileAsText(file) {
+  const buffer = await file.arrayBuffer();
+  try {
+    return new TextDecoder("gb18030").decode(buffer);
+  } catch {
+    return new TextDecoder("utf-8").decode(buffer);
+  }
+}
+
+async function importThsKlineFile(file) {
+  const code = state.selected?.code || $("#stockInput")?.value.replace(/\D/g, "").slice(0, 6);
+  const key = thsKlineStorageKey(code);
+  if (!key) {
+    alert("请先输入或选择一只股票代码");
+    return;
+  }
+  const text = await readFileAsText(file);
+  const rows = parseThsKlineText(text);
+  if (!rows.length) throw new Error("没有识别到同花顺K线数据，请确认导出列包含日期、开盘、最高、最低、收盘");
+  localStorage.setItem(key, JSON.stringify(rows.slice(-240)));
+  state.kline = rows;
+  state.chan = null;
+  renderKline();
+  renderChanAnalysis();
+  setKlineImportStatus(`已导入同花顺K线 ${rows.length} 条，行情源不可用时会自动使用。`, "is-ready");
+}
+
 function renderKline() {
   const rows = state.kline || [];
   const canvas = $("#klineCanvas");
@@ -1625,9 +1946,18 @@ async function loadKline(code = state.selected?.code, period = state.klinePeriod
     renderChanAnalysis();
     return;
   }
-  const data = await api(`/api/kline?code=${code}&period=${period}&limit=${period === "week" ? 120 : 60}`);
-  state.kline = data.klines || [];
-  state.chan = data.chan || null;
+  try {
+    const data = await api(`/api/kline?code=${code}&period=${period}&limit=${period === "week" ? 120 : 60}`);
+    state.kline = data.klines || [];
+    state.chan = data.chan || null;
+    setKlineImportStatus(data.estimated ? "行情源暂不可用，当前显示本地备用K线。" : "K线数据已同步。");
+  } catch (error) {
+    const importedRows = readImportedKline(code);
+    if (!importedRows.length) throw error;
+    state.kline = importedRows;
+    state.chan = null;
+    setKlineImportStatus("行情源不可用，已自动使用导入的同花顺K线数据。", "is-ready");
+  }
   renderKline();
   renderChanAnalysis();
   renderQuote();
@@ -1704,7 +2034,7 @@ async function sendStockChat(message) {
   appendChatMessage("assistant", "分析中...");
   const box = $("#stockChatMessages");
   const pending = box?.lastElementChild;
-  const response = await fetch("/api/stock-chat", {
+  const response = await fetch(`${API_BASE}/api/stock-chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ message, context })
@@ -1716,13 +2046,14 @@ async function sendStockChat(message) {
 
 async function loadAll(options = {}) {
   if (!options.fromRealtime) $("#updatedAt").textContent = "刷新中";
-  const [indices, sectors, limitUp, movers, activeStocks, fundFlow] = await Promise.all([
+  const [indices, sectors, limitUp, movers, activeStocks, fundFlow, overnightRows] = await Promise.all([
     safeApi("/api/indices"),
     safeApi(`/api/sectors?type=${state.sectorType}`),
     safeApi("/api/limit-up"),
     safeApi("/api/movers"),
     safeApi("/api/active-stocks"),
-    safeApi(`/api/fund-flow?type=${state.fundFlowType}`)
+    safeApi(`/api/fund-flow?type=${state.fundFlowType}`),
+    safeApi("/api/overnight-candidates")
   ]);
   state.indices = indices;
   state.sectors = sectors;
@@ -1730,6 +2061,7 @@ async function loadAll(options = {}) {
   state.movers = movers;
   state.activeStocks = activeStocks;
   state.fundFlow = fundFlow;
+  state.overnightCandidates = overnightRows;
   renderIndices();
   renderSectors();
   renderFundFlow();
@@ -1738,6 +2070,8 @@ async function loadAll(options = {}) {
   renderFirstBoard();
   renderHighOpenAccuracy();
   autoSaveHighOpenSnapshotIfNeeded().catch((error) => console.warn("尾盘冲高预测自动记录失败", error));
+  renderOvernightCandidates();
+  renderOvernightAccuracy();
   renderPredictions();
   renderPredictionAccuracy();
   renderQuote();
@@ -1749,7 +2083,6 @@ async function refreshSelectedStock({ refreshKline = false } = {}) {
   if (!code || code.length !== 6) return;
   state.selected = await safeApi(`/api/quote?code=${code}`, state.selected);
   renderQuote();
-  renderStockWorkspaceState();
   const now = Date.now();
   if (refreshKline || now - lastKlineRefreshAt >= KLINE_REFRESH_MS) {
     lastKlineRefreshAt = now;
@@ -1768,7 +2101,6 @@ async function analyze(code) {
   $("#stockInput").value = clean;
   state.selected = await api(`/api/quote?code=${clean}`);
   renderQuote();
-  renderStockWorkspaceState();
   renderTradingAgents(null);
   lastKlineRefreshAt = Date.now();
   loadKline(clean).catch((error) => {
@@ -1788,12 +2120,15 @@ $("#searchForm").addEventListener("submit", (event) => {
 });
 
 $("#refreshAll").addEventListener("click", () => refreshRealtimeData().catch((error) => alert(error.message)));
-$("#toggleStockWorkspace")?.addEventListener("click", () => setStockWorkspaceCollapsed(!state.stockWorkspaceCollapsed));
-$("#closeStockWorkspace")?.addEventListener("click", () => setStockWorkspaceCollapsed(true));
-$("#openStockWorkspaceRail")?.addEventListener("click", () => setStockWorkspaceCollapsed(false));
-$("#reloadFirstBoard").addEventListener("click", () => refreshRealtimeData().catch((error) => alert(error.message)));
+document.querySelectorAll("[data-sidebar-open]").forEach((button) => {
+  button.addEventListener("click", () => openPredictionSidebar(button.dataset.sidebarOpen));
+});
+$("#reloadFirstBoard").addEventListener("click", () => reloadHighOpenBoard().catch((error) => alert(error.message)));
 $("#saveHighOpenSnapshot").addEventListener("click", () => saveHighOpenSnapshot().catch((error) => alert(error.message)));
 $("#refreshHighOpenHistory").addEventListener("click", () => loadHighOpenHistory().catch((error) => alert(error.message)));
+$("#reloadOvernight")?.addEventListener("click", () => loadOvernightCandidates().catch((error) => alert(error.message)));
+$("#saveOvernightSnapshot")?.addEventListener("click", () => saveOvernightSnapshot().catch((error) => alert(error.message)));
+$("#refreshOvernightHistory")?.addEventListener("click", () => loadOvernightHistory().catch((error) => alert(error.message)));
 $("#highOpenMinPrice")?.addEventListener("input", readHighOpenFilter);
 $("#highOpenMaxPrice")?.addEventListener("input", readHighOpenFilter);
 $("#resetHighOpenFilter")?.addEventListener("click", () => {
@@ -1825,6 +2160,14 @@ $("#runTradingAgents").addEventListener("click", () => runTradingAgents().catch(
   $("#tradingAgentsView").textContent = error.message;
 }));
 $("#reloadKline").addEventListener("click", () => loadKline().catch((error) => alert(error.message)));
+$("#importThsKline")?.addEventListener("click", () => $("#thsKlineFile")?.click());
+$("#thsKlineFile")?.addEventListener("change", (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  importThsKlineFile(file).catch((error) => alert(error.message)).finally(() => {
+    event.target.value = "";
+  });
+});
 document.querySelectorAll("[data-kline-period]").forEach((button) => {
   button.addEventListener("click", () => {
     loadKline(state.selected?.code, button.dataset.klinePeriod).catch((error) => alert(error.message));
@@ -1855,19 +2198,13 @@ $("#reloadLimit").addEventListener("click", () => Promise.all([api("/api/limit-u
   renderQuote();
 }));
 
-$("#toggleSector").addEventListener("click", async () => {
+$("#toggleSector")?.addEventListener("click", async () => {
   state.sectorType = state.sectorType === "industry" ? "concept" : "industry";
   $("#toggleSector").textContent = state.sectorType === "industry" ? "概念" : "行业";
   state.sectors = await api(`/api/sectors?type=${state.sectorType}`);
   renderSectors();
   renderPredictions();
   renderQuote();
-});
-
-$("#toggleSectorPanel").addEventListener("click", () => {
-  state.sectorPanelCollapsed = !state.sectorPanelCollapsed;
-  localStorage.setItem("stock-sector-panel-collapsed", state.sectorPanelCollapsed ? "1" : "0");
-  renderSectorPanelState();
 });
 
 $("#toggleFundFlow").addEventListener("click", async () => {
@@ -1885,7 +2222,7 @@ document.querySelectorAll("[data-flow-period]").forEach((button) => {
   });
 });
 
-$("#addWatch").addEventListener("click", () => {
+$("#addWatch")?.addEventListener("click", () => {
   const code = $("#stockInput").value.replace(/\D/g, "").slice(0, 6);
   if (code.length !== 6 || state.watch.includes(code)) return;
   state.watch.unshift(code);
@@ -1893,7 +2230,7 @@ $("#addWatch").addEventListener("click", () => {
   renderWatch();
 });
 
-$("#watchList").addEventListener("click", (event) => {
+$("#watchList")?.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-code]");
   if (button) selectStockFromList(button.dataset.code);
 });
@@ -1910,6 +2247,12 @@ $("#predictionTable").addEventListener("click", (event) => {
 });
 
 $("#firstBoardTable").addEventListener("click", (event) => {
+  if (event.target.closest("a")) return;
+  const target = event.target.closest("[data-code]");
+  if (target) selectStockFromList(target.dataset.code);
+});
+
+$("#overnightTable")?.addEventListener("click", (event) => {
   if (event.target.closest("a")) return;
   const target = event.target.closest("[data-code]");
   if (target) selectStockFromList(target.dataset.code);
@@ -2020,11 +2363,11 @@ renderExpertTrades();
 syncSettingsForm();
 syncHighOpenFilter();
 initCollapsiblePanels();
-renderSectorPanelState();
-renderStockWorkspaceState();
+renderMarketSidebarState();
 startRealtimeSync();
 loadHighOpenHistory().catch(() => renderHighOpenAccuracy());
 loadPredictionHistory().catch(() => renderPredictionAccuracy());
+loadOvernightHistory().catch(() => renderOvernightAccuracy());
 loadAll().then(() => analyze(state.watch[0])).catch((error) => {
   $("#updatedAt").textContent = error.message;
 });

@@ -59,22 +59,10 @@ a:hover {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
   min-width: 0;
-  transition: grid-template-columns 180ms ease;
-}
-
-.sidebar {
-  border-right: 1px solid var(--line);
-  background: #fbfcfd;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-  overflow: hidden;
-  transition: opacity 160ms ease, padding 160ms ease, transform 160ms ease;
+  transition: none;
 }
 
 .brand {
@@ -89,18 +77,52 @@ a:hover {
   flex: 1;
 }
 
-.sidebar-fold-button {
-  min-height: 32px;
-  padding: 0 10px;
-  white-space: nowrap;
+.market-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  width: min(860px, calc(100vw - 16px));
+  height: 100vh;
+  min-width: 0;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: #f8fafc;
+  padding: 18px 18px 18px 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 18px 0 48px rgba(18, 32, 45, 0.16);
+  transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
 }
 
-.stock-workspace-rail {
+.market-sidebar.is-closed {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-18px);
+  overflow: hidden;
+}
+
+.market-sidebar-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.market-sidebar-rails {
   position: fixed;
   left: 10px;
-  top: 96px;
-  z-index: 20;
-  display: none;
+  top: 128px;
+  z-index: 42;
+  display: grid;
+  gap: 8px;
+}
+
+.market-sidebar-rail {
   min-height: 36px;
   border-color: var(--line);
   box-shadow: var(--shadow);
@@ -109,23 +131,66 @@ a:hover {
   padding: 10px 7px;
 }
 
-.app-shell.stock-workspace-collapsed {
-  grid-template-columns: 0 minmax(0, 1fr);
+.market-sidebar-rail.active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
 }
 
-.app-shell.stock-workspace-collapsed .sidebar {
-  opacity: 0;
-  padding: 0;
-  pointer-events: none;
-  transform: translateX(-8px);
+.market-sidebar .panel {
+  padding: 13px;
+  box-shadow: none;
 }
 
-.app-shell.stock-workspace-collapsed .quote-panel {
-  display: none;
+.market-sidebar .panel-head {
+  align-items: flex-start;
 }
 
-.app-shell.stock-workspace-collapsed .stock-workspace-rail {
-  display: block;
+.market-sidebar .panel-actions {
+  justify-content: flex-start;
+}
+
+.market-sidebar .panel-actions .ghost-button {
+  flex: 1 1 auto;
+}
+
+.market-sidebar .rush-dashboard {
+  grid-template-columns: 1fr;
+}
+
+.market-sidebar .filter-bar,
+.market-sidebar .rush-control-card .filter-bar,
+.market-sidebar .accuracy-panel {
+  grid-template-columns: 1fr;
+}
+
+.market-sidebar .rush-control-card .filter-bar button,
+.market-sidebar .rush-control-card .filter-bar span {
+  grid-column: auto;
+}
+
+.market-sidebar .table-wrap {
+  max-height: 340px;
+}
+
+.market-sidebar .rush-insight-card .prediction-history-list,
+.market-sidebar .prediction-history-list,
+.market-sidebar .sector-list {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.market-sidebar table {
+  font-size: 13px;
+}
+
+.market-sidebar th,
+.market-sidebar td {
+  padding: 8px;
+}
+
+.market-sidebar .plan-cell {
+  min-width: 280px;
 }
 
 .brand-mark {
@@ -213,6 +278,7 @@ textarea {
 }
 
 .workspace {
+  grid-column: 1;
   padding: 22px;
   display: grid;
   gap: 18px;
@@ -254,6 +320,51 @@ textarea {
   align-self: flex-start;
 }
 
+.stock-workspace-tools {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 12px;
+  margin-top: 14px;
+  align-items: stretch;
+}
+
+.stock-tool-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.stock-search-card {
+  display: grid;
+  gap: 12px;
+}
+
+.compact-brand .brand-mark {
+  width: 40px;
+  height: 40px;
+}
+
+.compact-brand h1 {
+  font-size: 16px;
+}
+
+.stock-tool-card .watch-list,
+.stock-tool-card .mini-grid {
+  max-height: 180px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.stock-tool-card.compact h3 {
+  margin-bottom: 8px;
+}
+
+.stock-tool-card.compact .mini-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .score-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -291,12 +402,8 @@ textarea {
 }
 
 .market-board {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-areas:
-    "first first"
-    "limit limit"
-    "flow flow"
-    "sector sector";
+  grid-template-columns: 1fr;
+  grid-template-areas: "flow";
   align-items: start;
 }
 
@@ -397,14 +504,6 @@ textarea {
   grid-area: limit;
 }
 
-.sector-panel {
-  grid-area: sector;
-}
-
-.sector-panel .panel-head {
-  align-items: flex-start;
-}
-
 .flow-panel {
   grid-area: flow;
 }
@@ -503,18 +602,6 @@ textarea {
   color: #9a3412;
 }
 
-.sector-panel.collapsed {
-  padding-bottom: 14px;
-}
-
-.sector-panel.collapsed #sectorList {
-  display: none;
-}
-
-.sector-panel.collapsed .panel-head {
-  margin-bottom: 0;
-}
-
 .collapsible-panel.is-collapsed {
   padding-bottom: 14px;
 }
@@ -557,20 +644,7 @@ textarea {
   align-self: start;
 }
 
-.sidebar .compact {
-  padding: 12px;
-}
-
-.sidebar .compact h2 {
-  margin-bottom: 0;
-}
-
-.sidebar .compact .mini-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.sidebar .compact .mini-item {
+.stock-tool-card .mini-item {
   grid-template-columns: 1fr;
   gap: 3px;
   padding: 8px;
@@ -624,6 +698,17 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+}
+
+.kline-import-status {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kline-import-status.is-ready {
+  color: var(--green);
 }
 
 .kline-table-wrap {
@@ -1118,11 +1203,6 @@ textarea {
   font-size: 15px;
 }
 
-.sector-panel .sector-item {
-  min-height: 54px;
-  padding: 9px 10px;
-}
-
 .pick-card {
   width: 100%;
   color: var(--ink);
@@ -1474,27 +1554,48 @@ tr:last-child td {
   color: var(--red);
 }
 
+@media (max-width: 1360px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .market-sidebar {
+    left: 0;
+    width: min(820px, calc(100vw - 16px));
+    padding: 14px 14px 14px 84px;
+  }
+
+  .market-sidebar-rail {
+    left: 10px;
+  }
+
+  .stock-workspace-tools {
+    grid-template-columns: minmax(260px, 0.95fr) minmax(260px, 1fr);
+  }
+
+  .stock-workspace-tools .compact {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+  .workspace {
+    grid-column: 1;
   }
 
-  .app-shell.stock-workspace-collapsed {
-    grid-template-columns: 1fr;
+  .market-sidebar {
+    left: 0;
+    width: min(760px, calc(100vw - 16px));
+    border-left: 0;
   }
 
-  .app-shell.stock-workspace-collapsed .sidebar {
-    max-height: 0;
-    border-bottom: 0;
-  }
-
-  .stock-workspace-rail {
-    top: 82px;
+  .market-sidebar-rails {
+    left: 10px;
+    top: 128px;
   }
 
   .score-strip,
@@ -1516,12 +1617,8 @@ tr:last-child td {
   }
 
   .market-board {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      "first first"
-      "limit limit"
-      "flow flow"
-      "sector sector";
+    grid-template-columns: 1fr;
+    grid-template-areas: "flow";
   }
 
   .trade-plan {
@@ -1551,8 +1648,25 @@ tr:last-child td {
 
 @media (max-width: 720px) {
   .workspace,
-  .sidebar {
+  .market-sidebar {
     padding: 14px;
+  }
+
+  .market-sidebar {
+    width: min(100vw, calc(100vw - 8px));
+    padding-left: 64px;
+  }
+
+  .market-sidebar-rails {
+    left: 6px;
+    top: 104px;
+    gap: 6px;
+  }
+
+  .market-sidebar-rail {
+    min-height: 32px;
+    padding: 8px 5px;
+    font-size: 12px;
   }
 
   .topbar,
@@ -1566,6 +1680,7 @@ tr:last-child td {
   .grid-layout,
   .board-grid,
   .ai-picks-grid,
+  .stock-workspace-tools,
   .metric-grid,
   .settings-grid,
   .trade-plan,
@@ -1589,13 +1704,13 @@ tr:last-child td {
       "experts";
   }
 
+  .stock-workspace-tools .compact {
+    grid-column: auto;
+  }
+
   .market-board {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      "first"
-      "limit"
-      "flow"
-      "sector";
+    grid-template-areas: "flow";
     overflow-x: visible;
   }
 

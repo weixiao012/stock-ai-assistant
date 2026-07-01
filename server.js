@@ -10,13 +10,17 @@ const publicDir = join(root, "public");
 const dataDir = join(root, "data");
 const predictionHistoryFile = join(dataDir, "prediction-history.json");
 const highOpenHistoryFile = join(dataDir, "high-open-history.json");
+const overnightHistoryFile = join(dataDir, "overnight-history.json");
 const port = Number(process.env.PORT || 3788);
 const execFileAsync = promisify(execFile);
 const curlCommand = process.platform === "win32" ? "curl.exe" : "curl";
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
-  "cache-control": "no-store"
+  "cache-control": "no-store",
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,POST,OPTIONS",
+  "access-control-allow-headers": "content-type"
 };
 
 const mimeTypes = {
@@ -144,6 +148,23 @@ async function writeHighOpenHistory(data) {
   await writeFile(highOpenHistoryFile, JSON.stringify(data, null, 2), "utf8");
 }
 
+async function readOvernightHistory() {
+  try {
+    const text = await readFile(overnightHistoryFile, "utf8");
+    const data = JSON.parse(text);
+    return {
+      snapshots: Array.isArray(data.snapshots) ? data.snapshots : []
+    };
+  } catch {
+    return { snapshots: [] };
+  }
+}
+
+async function writeOvernightHistory(data) {
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(overnightHistoryFile, JSON.stringify(data, null, 2), "utf8");
+}
+
 function normalizePredictions(rows = []) {
   return rows
     .filter((item) => item?.code && item?.name)
@@ -175,6 +196,31 @@ function normalizeHighOpenPredictions(rows = []) {
       turnover: Number(item.turnover || 0),
       volumeRatio: Number(item.volumeRatio || 0),
       amount: Number(item.amount || 0)
+    }));
+}
+
+function normalizeOvernightPredictions(rows = []) {
+  return rows
+    .filter((item) => item?.code && item?.name)
+    .slice(0, 30)
+    .map((item, index) => ({
+      rank: index + 1,
+      code: String(item.code).padStart(6, "0").slice(0, 6),
+      name: String(item.name || ""),
+      probability: Number(item.overnightProbability ?? item.probability ?? 0),
+      source: String(item.source || "一夜持股候选"),
+      reason: String(item.reason || ""),
+      risk: String(item.risk || ""),
+      changePct: Number(item.changePct || 0),
+      turnover: Number(item.turnover || 0),
+      volumeRatio: Number(item.volumeRatio || 0),
+      amount: Number(item.amount || 0),
+      marketCap: Number(item.marketCap || item.floatMarketCap || 0),
+      floatMarketCap: Number(item.floatMarketCap || 0),
+      lastLimitDate: String(item.lastLimitDate || ""),
+      aboveAverageStatus: String(item.aboveAverageStatus || "pending"),
+      aboveAverageRatio: Number(item.aboveAverageRatio || 0),
+      factors: Array.isArray(item.factors) ? item.factors.slice(0, 8).map(String) : []
     }));
 }
 
@@ -308,6 +354,90 @@ function summarizeHighOpenAccuracy(snapshots = []) {
   };
 }
 
+async function settleOvernightSnapshot(snapshot) {
+  if (!snapshot?.targetDate) return snapshot;
+  if (snapshot.status === "settled" && (snapshot.results || []).some((item) => item.nextHighPct !== undefined)) return snapshot;
+  if (snapshot.targetDate > chinaDate()) return snapshot;
+  const predictions = snapshot.predictions || [];
+  const results = [];
+  for (const item of predictions) {
+    try {
+      const rows = await dailyKlines(item.code, 45);
+      const targetIndex = rows.findIndex((row) => row.date === snapshot.targetDate);
+      if (targetIndex <= 0) {
+        results.push({ ...item, hit: false, reason: "缺少目标日K线，暂不计入有效样本" });
+        continue;
+      }
+      const prev = rows[targetIndex - 1];
+      const target = rows[targetIndex];
+      const base = Number(prev.close || 0);
+      const nextOpenPct = base ? ((target.open - base) / base) * 100 : 0;
+      const nextHighPct = base ? ((target.high - base) / base) * 100 : 0;
+      const nextClosePct = base ? ((target.close - base) / base) * 100 : 0;
+      const maxDrawdownPct = base ? ((target.low - base) / base) * 100 : 0;
+      const hit = nextHighPct >= 3 && maxDrawdownPct >= -3;
+      results.push({
+        ...item,
+        hit,
+        nextOpenPct: Math.round(nextOpenPct * 100) / 100,
+        nextHighPct: Math.round(nextHighPct * 100) / 100,
+        nextClosePct: Math.round(nextClosePct * 100) / 100,
+        maxDrawdownPct: Math.round(maxDrawdownPct * 100) / 100,
+        prevDate: prev.date,
+        prevClose: prev.close,
+        targetOpen: target.open,
+        targetHigh: target.high,
+        targetClose: target.close,
+        targetLow: target.low,
+        reason: hit ? "次日盘中高点达到+3%且回撤未破-3%" : "次日弹性或风控未达标"
+      });
+    } catch (error) {
+      results.push({ ...item, hit: false, reason: error.message || "结算失败" });
+    }
+  }
+  const validResults = results.filter((item) => item.nextHighPct !== undefined);
+  if (!validResults.length) {
+    return {
+      ...snapshot,
+      status: "pending",
+      settleError: "No valid target-day kline data; keep pending instead of counting failures as misses.",
+      lastTriedSettleAt: new Date().toISOString()
+    };
+  }
+  const hitCodes = new Set(validResults.filter((item) => item.hit).map((item) => item.code));
+  return {
+    ...snapshot,
+    status: "settled",
+    settledAt: new Date().toISOString(),
+    top5: accuracyFor(validResults, hitCodes, 5),
+    top10: accuracyFor(validResults, hitCodes, 10),
+    all: accuracyFor(validResults, hitCodes, validResults.length),
+    results,
+    hits: validResults.filter((item) => item.hit)
+  };
+}
+
+function summarizeOvernightAccuracy(snapshots = []) {
+  const summary = summarizeAccuracy(snapshots);
+  const settled = snapshots.filter((item) => item.status === "settled");
+  const resultRows = settled.flatMap((item) => item.results || []);
+  const avgHigh = resultRows.length
+    ? Math.round((resultRows.reduce((sum, item) => sum + Number(item.nextHighPct || 0), 0) / resultRows.length) * 100) / 100
+    : 0;
+  const avgClose = resultRows.length
+    ? Math.round((resultRows.reduce((sum, item) => sum + Number(item.nextClosePct || 0), 0) / resultRows.length) * 100) / 100
+    : 0;
+  return {
+    ...summary,
+    avgHigh,
+    avgClose,
+    modelVersion: "overnight-tail-v1",
+    suggestion: summary.settledDays
+      ? `一夜持股Top5命中率 ${summary.top5.rate}%，平均次日高点 ${avgHigh}%，平均收盘 ${avgClose}%；低样本阶段只用于复盘调权。`
+      : "暂无已结算一夜持股样本，先连续记录3-5个交易日，再根据Top5命中率调高或调低阈值。"
+  };
+}
+
 function secidFromCode(rawCode) {
   const code = String(rawCode || "").replace(/\D/g, "").slice(0, 6);
   if (!/^\d{6}$/.test(code)) return null;
@@ -353,6 +483,23 @@ function normalizeStock(row) {
   };
 }
 
+const fallbackIndices = [
+  { code: "000001", name: "上证指数", price: 2988.42, changePct: 0.46, change: 13.7, volume: 0, amount: 428000000000, turnover: 0, pe: 0, volumeRatio: 1.02, high: 2996.8, low: 2968.2, open: 2972.3, previousClose: 2974.7, marketCap: 0, floatMarketCap: 0, speed: 0.01, pb: 0 },
+  { code: "399001", name: "深证成指", price: 9328.6, changePct: 0.82, change: 75.9, volume: 0, amount: 612000000000, turnover: 0, pe: 0, volumeRatio: 1.08, high: 9362.1, low: 9230.2, open: 9248.3, previousClose: 9252.7, marketCap: 0, floatMarketCap: 0, speed: 0.02, pb: 0 },
+  { code: "399006", name: "创业板指", price: 1816.3, changePct: 1.15, change: 20.6, volume: 0, amount: 268000000000, turnover: 0, pe: 0, volumeRatio: 1.12, high: 1824.5, low: 1792.1, open: 1797.4, previousClose: 1795.7, marketCap: 0, floatMarketCap: 0, speed: 0.03, pb: 0 },
+  { code: "000300", name: "沪深300", price: 3548.9, changePct: 0.58, change: 20.4, volume: 0, amount: 286000000000, turnover: 0, pe: 0, volumeRatio: 1.03, high: 3560.2, low: 3524.8, open: 3529.1, previousClose: 3528.5, marketCap: 0, floatMarketCap: 0, speed: 0.01, pb: 0 },
+  { code: "000688", name: "科创50", price: 742.6, changePct: 1.34, change: 9.8, volume: 0, amount: 86000000000, turnover: 0, pe: 0, volumeRatio: 1.18, high: 746.8, low: 729.4, open: 732.2, previousClose: 732.8, marketCap: 0, floatMarketCap: 0, speed: 0.04, pb: 0 }
+];
+
+const fallbackStocks = [
+  { code: "300059", name: "东方财富", price: 15.86, changePct: 3.12, change: 0.48, volume: 0, amount: 5200000000, turnover: 5.8, pe: 31.2, volumeRatio: 1.55, high: 16.12, low: 15.22, open: 15.31, previousClose: 15.38, marketCap: 0, floatMarketCap: 238000000000, speed: 0.05, pb: 3.2 },
+  { code: "600030", name: "中信证券", price: 20.42, changePct: 1.84, change: 0.37, volume: 0, amount: 3100000000, turnover: 2.3, pe: 17.6, volumeRatio: 1.18, high: 20.58, low: 20.02, open: 20.08, previousClose: 20.05, marketCap: 0, floatMarketCap: 226000000000, speed: 0.02, pb: 1.1 },
+  { code: "002167", name: "东方锆业", price: 8.74, changePct: 6.2, change: 0.51, volume: 0, amount: 1800000000, turnover: 12.8, pe: 0, volumeRatio: 2.35, high: 8.92, low: 8.18, open: 8.25, previousClose: 8.23, marketCap: 0, floatMarketCap: 6200000000, speed: 0.11, pb: 4.8 },
+  { code: "000725", name: "京东方A", price: 4.36, changePct: 2.59, change: 0.11, volume: 0, amount: 4200000000, turnover: 2.9, pe: 26.5, volumeRatio: 1.42, high: 4.42, low: 4.25, open: 4.27, previousClose: 4.25, marketCap: 0, floatMarketCap: 158000000000, speed: 0.03, pb: 1.3 },
+  { code: "002202", name: "金风科技", price: 9.64, changePct: 4.56, change: 0.42, volume: 0, amount: 2100000000, turnover: 4.7, pe: 22.4, volumeRatio: 1.92, high: 9.78, low: 9.18, open: 9.2, previousClose: 9.22, marketCap: 0, floatMarketCap: 32000000000, speed: 0.07, pb: 1.5 },
+  { code: "300666", name: "江丰电子", price: 62.8, changePct: 5.84, change: 3.46, volume: 0, amount: 1900000000, turnover: 6.6, pe: 58.2, volumeRatio: 2.18, high: 64.2, low: 59.3, open: 59.8, previousClose: 59.34, marketCap: 0, floatMarketCap: 12800000000, speed: 0.09, pb: 5.2 }
+];
+
 async function quote(reqUrl) {
   const code = reqUrl.searchParams.get("code");
   const secid = secidFromCode(code);
@@ -374,39 +521,64 @@ async function listBySecids(secids) {
 }
 
 async function indices() {
-  return listBySecids("1.000001,0.399001,0.399006,1.000300,1.000688");
+  try {
+    return await listBySecids("1.000001,0.399001,0.399006,1.000300,1.000688");
+  } catch {
+    return fallbackIndices.map((item) => ({ ...item, estimated: true }));
+  }
 }
 
 async function sectors(type = "industry") {
   const fs = type === "concept" ? "m:90+t:3" : "m:90+t:2";
   const fields = "f12,f14,f2,f3,f4,f5,f6,f8,f9,f10,f15,f16,f17,f18";
   const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=60&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${fs}&fields=${fields}`;
-  const data = await fetchJson(url);
-  return (data?.data?.diff || []).map((row) => ({
-    code: row.f12,
-    name: row.f14,
-    price: row.f2,
-    changePct: row.f3,
-    amount: row.f6,
-    turnover: row.f8,
-    volumeRatio: row.f10
-  }));
+  try {
+    const data = await fetchJson(url);
+    return (data?.data?.diff || []).map((row) => ({
+      code: row.f12,
+      name: row.f14,
+      price: row.f2,
+      changePct: row.f3,
+      amount: row.f6,
+      turnover: row.f8,
+      volumeRatio: row.f10
+    }));
+  } catch {
+    return fallbackSectorFlows.slice(0, 10).map(([code, name, changePct, amount, volumeRatio]) => ({
+      code,
+      name,
+      price: null,
+      changePct,
+      amount,
+      turnover: 0,
+      volumeRatio,
+      estimated: true
+    }));
+  }
 }
 
 async function movers() {
   const fields = "f12,f14,f2,f3,f4,f5,f6,f8,f9,f10,f15,f16,f17,f18,f20,f21,f22,f23";
   const fs = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23";
   const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${fs}&fields=${fields}`;
-  const data = await fetchJson(url);
-  return (data?.data?.diff || []).map(normalizeStock).filter((item) => !item.name?.includes("ST"));
+  try {
+    const data = await fetchJson(url);
+    return (data?.data?.diff || []).map(normalizeStock).filter((item) => !item.name?.includes("ST"));
+  } catch {
+    return fallbackStocks.map((item) => ({ ...item, estimated: true }));
+  }
 }
 
 async function activeStocks() {
   const fields = "f12,f14,f2,f3,f4,f5,f6,f8,f9,f10,f15,f16,f17,f18,f20,f21,f22,f23";
   const fs = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23";
   const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=150&po=1&np=1&fltt=2&invt=2&fid=f6&fs=${fs}&fields=${fields}`;
-  const data = await fetchJson(url);
-  return (data?.data?.diff || []).map(normalizeStock).filter((item) => !item.name?.includes("ST"));
+  try {
+    const data = await fetchJson(url);
+    return (data?.data?.diff || []).map(normalizeStock).filter((item) => !item.name?.includes("ST"));
+  } catch {
+    return fallbackStocks.map((item) => ({ ...item, estimated: true }));
+  }
 }
 
 const fallbackSectorFlows = [
@@ -562,6 +734,172 @@ async function dailyKlines(code, limit = 30, period = "day") {
       turnover: num(turnover)
     };
   });
+}
+
+async function intradayAboveAverage(code) {
+  const secid = secidFromCode(code);
+  if (!secid) return { status: "pending", ratio: 0, reason: "invalid code" };
+  const url = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${secid}&ndays=1&iscr=0&iscca=0&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58`;
+  try {
+    const data = await fetchJson(url);
+    const rows = (data?.data?.trends || [])
+      .map((line) => {
+        const [time, price, avgPrice, volume, amount] = String(line).split(",");
+        return { time, price: num(price), avgPrice: num(avgPrice), volume: num(volume), amount: num(amount) };
+      })
+      .filter((item) => item.price > 0 && item.avgPrice > 0);
+    if (!rows.length) return { status: "pending", ratio: 0, reason: "intraday data missing" };
+    const valid = rows.filter((item) => item.price >= item.avgPrice * 0.998);
+    const ratio = valid.length / rows.length;
+    return {
+      status: ratio >= 0.95 ? "confirmed" : "failed",
+      ratio: Math.round(ratio * 1000) / 10,
+      firstTime: rows[0]?.time || "",
+      lastTime: rows.at(-1)?.time || "",
+      reason: ratio >= 0.95 ? "price stayed above avg line" : "price broke avg line"
+    };
+  } catch (error) {
+    return { status: "pending", ratio: 0, reason: error.message || "intraday pending" };
+  }
+}
+
+function hasLimitUpInMonth(rows = []) {
+  const lookback = rows.slice(0, -1).slice(-30);
+  const found = [...lookback].reverse().find((item) => Number(item.changePct || 0) >= 9.7);
+  return found ? { ok: true, date: found.date, changePct: found.changePct } : { ok: false, date: "", changePct: 0 };
+}
+
+function overnightRawRejectReason(item) {
+  const change = num(item.changePct);
+  const turnover = num(item.turnover);
+  const volumeRatio = num(item.volumeRatio);
+  const marketCap = num(item.marketCap || item.floatMarketCap);
+  if (item.name?.includes("ST")) return "ST";
+  if (change < 3 || change > 5) return "change not 3-5";
+  if (!marketCap || marketCap > 20000000000) return "market cap over 20b";
+  if (volumeRatio <= 1) return "volume ratio <= 1";
+  if (turnover < 5 || turnover > 10) return "turnover not 5-10";
+  return "";
+}
+
+function overnightScore(item, klines = [], intraday = {}) {
+  const change = num(item.changePct);
+  const turnover = num(item.turnover);
+  const volumeRatio = num(item.volumeRatio);
+  const amount = num(item.amount);
+  const marketCap = num(item.marketCap || item.floatMarketCap);
+  const latest = klines.at(-1) || {};
+  const prev = klines.at(-2) || {};
+  const price = num(item.price || latest.close);
+  const closeStrength = latest.high && latest.low ? ((price - latest.low) / Math.max(0.01, latest.high - latest.low)) * 100 : 50;
+  const monthHigh = Math.max(...klines.slice(-22).map((row) => num(row.high)));
+  const nearMonthHigh = monthHigh && price ? (price / monthHigh) * 100 : 0;
+  let score = 46;
+  score += change >= 3.2 && change <= 4.6 ? 16 : 7;
+  score += turnover >= 6 && turnover <= 8.8 ? 13 : 5;
+  score += volumeRatio >= 1.15 && volumeRatio <= 2.8 ? 12 : volumeRatio > 4 ? -8 : 4;
+  score += amount >= 500000000 && amount <= 8000000000 ? 10 : amount > 0 ? 3 : -4;
+  score += marketCap > 0 && marketCap <= 8000000000 ? 9 : marketCap <= 20000000000 ? 5 : -18;
+  score += closeStrength >= 70 ? 8 : closeStrength >= 55 ? 4 : -8;
+  score += nearMonthHigh >= 92 ? 6 : nearMonthHigh >= 82 ? 3 : -4;
+  score += sectorHeatBonus(item.industry || item.name, item.code);
+  if (intraday.status === "confirmed") score += 12;
+  if (intraday.status === "pending") score -= 3;
+  if (intraday.status === "failed") score -= 40;
+  if (prev.changePct < -4 && latest.changePct > 4) score += 4;
+  return Math.max(0, Math.min(99, Math.round(score)));
+}
+
+function overnightFactorText(item, limitInfo, intraday, klines = []) {
+  const latest = klines.at(-1) || {};
+  const price = num(item.price || latest.close);
+  const closeStrength = latest.high && latest.low
+    ? Math.round(((price - latest.low) / Math.max(0.01, latest.high - latest.low)) * 100)
+    : 0;
+  return [
+    `gain ${num(item.changePct).toFixed(2)}%`,
+    `limit ${limitInfo.date || "verified"}`,
+    `cap ${Math.round(num(item.marketCap || item.floatMarketCap) / 100000000)}y`,
+    `vr ${num(item.volumeRatio).toFixed(2)}`,
+    `turn ${num(item.turnover).toFixed(2)}%`,
+    intraday.status === "confirmed" ? `avg ${intraday.ratio}%` : "avg pending",
+    closeStrength ? `close ${closeStrength}%` : ""
+  ].filter(Boolean);
+}
+
+function fallbackOvernightCandidates() {
+  return [
+    {
+      code: "002202",
+      name: "金风科技",
+      price: 9.64,
+      changePct: 4.56,
+      turnover: 6.2,
+      volumeRatio: 1.92,
+      amount: 2100000000,
+      marketCap: 18000000000,
+      floatMarketCap: 18000000000,
+      lastLimitDate: chinaDate(-8),
+      aboveAverageStatus: "pending",
+      aboveAverageRatio: 0,
+      overnightProbability: 72,
+      source: "fallback sample",
+      reason: "行情源降级样例：涨幅、近月涨停、市值、量比、换手满足，分时均价线需人工核验。",
+      risk: "样例只用于页面兜底，不作为真实预测。",
+      factors: ["gain 4.56%", "cap 180y", "vr 1.92", "turn 6.20%", "avg pending"],
+      estimated: true
+    }
+  ];
+}
+
+async function overnightCandidates() {
+  let pool = [];
+  try {
+    const [moverRows, activeRows] = await Promise.all([movers(), activeStocks()]);
+    const byCode = new Map();
+    [...moverRows, ...activeRows].forEach((item) => {
+      if (!item?.code || byCode.has(item.code)) return;
+      byCode.set(item.code, item);
+    });
+    pool = [...byCode.values()];
+  } catch {
+    pool = fallbackStocks;
+  }
+  const prefiltered = pool
+    .filter((item) => !overnightRawRejectReason(item))
+    .sort((a, b) => num(b.amount) - num(a.amount))
+    .slice(0, 36);
+  const rows = [];
+  for (const item of prefiltered) {
+    try {
+      const klines = await dailyKlines(item.code, 36);
+      const limitInfo = hasLimitUpInMonth(klines);
+      if (!limitInfo.ok) continue;
+      const intraday = await intradayAboveAverage(item.code);
+      if (intraday.status === "failed") continue;
+      const score = overnightScore(item, klines, intraday);
+      if (score < 68) continue;
+      const factors = overnightFactorText(item, limitInfo, intraday, klines);
+      rows.push({
+        ...item,
+        marketCap: num(item.marketCap || item.floatMarketCap),
+        lastLimitDate: limitInfo.date,
+        aboveAverageStatus: intraday.status,
+        aboveAverageRatio: intraday.ratio,
+        overnightProbability: score,
+        source: intraday.status === "confirmed" ? "avg-line confirmed" : "avg-line pending",
+        reason: factors.slice(0, 5).join(" / "),
+        risk: intraday.status === "confirmed"
+          ? "仅用于尾盘记录验证；次日高开过多或跌破昨收需放弃。"
+          : "分时均价线待核验，需在同花顺/东方财富人工确认全天强承接。",
+        factors
+      });
+    } catch {
+      // Keep the board responsive when a single stock data source fails.
+    }
+  }
+  const sorted = rows.sort((a, b) => b.overnightProbability - a.overnightProbability).slice(0, 12);
+  return sorted.length ? sorted : fallbackOvernightCandidates();
 }
 
 async function minuteFundFlow(code, limit = 12) {
@@ -943,8 +1281,8 @@ function fallbackFlowPoints(item, period, pointLimit) {
     let time;
     if (period === "day") {
       const start = new Date(now);
-      start.setHours(9, 30, 0, 0);
-      start.setMinutes(start.getMinutes() + Math.round(progress * 240));
+      start.setHours(9, 15, 0, 0);
+      start.setMinutes(start.getMinutes() + Math.round(progress * 345));
       time = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")} ${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
     } else {
       const date = new Date(now);
@@ -1137,6 +1475,35 @@ async function saveHighOpenSnapshot(req) {
   return { ok: true, snapshot, summary: summarizeHighOpenAccuracy(history.snapshots) };
 }
 
+async function saveOvernightSnapshot(req) {
+  const body = await readJsonBody(req);
+  const today = body.date || chinaDate();
+  const targetDate = body.targetDate || nextTradeDate(today);
+  const predictions = normalizeOvernightPredictions(body.predictions || []);
+  if (!predictions.length) {
+    return { error: "没有可保存的一夜持股预测记录" };
+  }
+  const history = await readOvernightHistory();
+  const snapshot = {
+    date: today,
+    targetDate,
+    savedAt: new Date().toISOString(),
+    status: "pending",
+    modelVersion: body.modelVersion || "overnight-tail-v1",
+    predictionWindow: body.predictionWindow || {},
+    settings: body.settings || {},
+    predictions
+  };
+  const index = history.snapshots.findIndex((item) => item.date === today && item.modelVersion === snapshot.modelVersion);
+  if (index >= 0) history.snapshots[index] = { ...history.snapshots[index], ...snapshot };
+  else history.snapshots.unshift(snapshot);
+  history.snapshots = history.snapshots
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 80);
+  await writeOvernightHistory(history);
+  return { ok: true, snapshot, summary: summarizeOvernightAccuracy(history.snapshots) };
+}
+
 async function predictionHistory() {
   const history = await readPredictionHistory();
   let changed = false;
@@ -1179,6 +1546,27 @@ async function highOpenHistory() {
   };
 }
 
+async function overnightHistory() {
+  const history = await readOvernightHistory();
+  let changed = false;
+  const snapshots = [];
+  for (const item of history.snapshots) {
+    try {
+      const settled = await settleOvernightSnapshot(item);
+      if (settled !== item) changed = true;
+      snapshots.push(settled);
+    } catch {
+      snapshots.push(item);
+    }
+  }
+  const nextHistory = { snapshots };
+  if (changed) await writeOvernightHistory(nextHistory);
+  return {
+    summary: summarizeOvernightAccuracy(snapshots),
+    snapshots: snapshots.slice(0, 30)
+  };
+}
+
 async function limitUpPoolByDate(dateText = chinaDate()) {
   const date = compactDate(dateText);
   const url = `https://push2ex.eastmoney.com/getTopicZTPool?ut=7eea3edcaed734bea9cbfc24409ed989&dpt=wz.ztzt&Pageindex=0&pagesize=120&sort=fbt:asc&date=${date}`;
@@ -1206,25 +1594,103 @@ async function limitUpPool() {
   return limitUpPoolByDate(chinaDate());
 }
 
+async function quoteWithFallback(reqUrl) {
+  try {
+    return await quote(reqUrl);
+  } catch {
+    const cleanCode = String(reqUrl.searchParams.get("code") || "").replace(/\D/g, "").slice(0, 6);
+    const fallback = fallbackStocks.find((item) => item.code === cleanCode);
+    return fallback ? { ...fallback, estimated: true } : { error: "行情源暂不可用，且没有本地备用数据" };
+  }
+}
+
+async function limitUpPoolWithFallback() {
+  try {
+    return await limitUpPool();
+  } catch {
+    return fallbackStocks
+      .filter((item) => Number(item.changePct || 0) >= 4)
+      .map((item, index) => ({
+        ...item,
+        boardCount: index === 0 ? 2 : 1,
+        firstLimitTime: 93000 + index * 500,
+        lastLimitTime: 140000 + index * 300,
+        sealFund: Math.round(Number(item.amount || 0) * 0.08),
+        brokenCount: index % 2,
+        industry: index % 2 ? "新能源" : "科技",
+        estimated: true
+      }));
+  }
+}
+
+function fallbackKlinesForCode(code, limit = 60) {
+  const cleanCode = String(code || "").replace(/\D/g, "").slice(0, 6);
+  const stock = fallbackStocks.find((item) => item.code === cleanCode) || fallbackStocks[0];
+  const count = Math.max(12, Math.min(80, Number(limit) || 60));
+  const start = Number(stock.previousClose || stock.price || 10);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    date.setDate(date.getDate() - (count - 1 - index));
+    const drift = 1 + Math.sin(index / 4) * 0.025 + (index - count / 2) * 0.0015;
+    const open = start * drift;
+    const close = index === count - 1 ? Number(stock.price || open) : open * (1 + Math.cos(index / 5) * 0.012);
+    const high = Math.max(open, close) * 1.018;
+    const low = Math.min(open, close) * 0.982;
+    const previous = index ? start * (1 + Math.sin((index - 1) / 4) * 0.025 + (index - 1 - count / 2) * 0.0015) : start;
+    return {
+      date: date.toISOString().slice(0, 10),
+      open: Number(open.toFixed(2)),
+      close: Number(close.toFixed(2)),
+      high: Number(high.toFixed(2)),
+      low: Number(low.toFixed(2)),
+      volume: 0,
+      amount: Number(stock.amount || 0),
+      amplitude: Number((((high - low) / previous) * 100).toFixed(2)),
+      changePct: Number((((close - previous) / previous) * 100).toFixed(2)),
+      change: Number((close - previous).toFixed(2)),
+      turnover: Number(stock.turnover || 0),
+      estimated: true
+    };
+  });
+}
+
+async function klineApiWithFallback(reqUrl) {
+  try {
+    return await klineApi(reqUrl);
+  } catch {
+    const code = reqUrl.searchParams.get("code");
+    const limit = Math.max(5, Math.min(120, Number(reqUrl.searchParams.get("limit") || 40)));
+    const period = ["day", "week", "month"].includes(reqUrl.searchParams.get("period"))
+      ? reqUrl.searchParams.get("period")
+      : "day";
+    const quoteData = await quoteWithFallback(reqUrl);
+    const klines = fallbackKlinesForCode(code, limit);
+    return { quote: quoteData, klines, period, chan: chanAnalysisFromKlines(klines), estimated: true };
+  }
+}
+
 async function routeApi(req, reqUrl, res) {
   try {
     const routes = {
-      "/api/quote": () => quote(reqUrl),
+      "/api/quote": () => quoteWithFallback(reqUrl),
       "/api/indices": () => indices(),
       "/api/sectors": () => sectors(reqUrl.searchParams.get("type") || "industry"),
       "/api/movers": () => movers(),
       "/api/active-stocks": () => activeStocks(),
-      "/api/limit-up": () => limitUpPool(),
+      "/api/limit-up": () => limitUpPoolWithFallback(),
+      "/api/overnight-candidates": () => overnightCandidates(),
       "/api/fund-flow": () => fundFlow(reqUrl.searchParams.get("type") || "sector"),
       "/api/trading-agents": () => tradingAgents(reqUrl),
-      "/api/kline": () => klineApi(reqUrl),
+      "/api/kline": () => klineApiWithFallback(reqUrl),
       "/api/chan-analysis": () => chanAnalysisApi(reqUrl),
       "/api/sector-flow-lines": () => sectorFlowLines(reqUrl),
       "/api/stock-chat": () => stockChat(req, reqUrl),
       "/api/prediction-history": () => predictionHistory(),
       "/api/prediction-history/save": () => savePredictionSnapshot(req),
       "/api/high-open-history": () => highOpenHistory(),
-      "/api/high-open-history/save": () => saveHighOpenSnapshot(req)
+      "/api/high-open-history/save": () => saveHighOpenSnapshot(req),
+      "/api/overnight-history": () => overnightHistory(),
+      "/api/overnight-history/save": () => saveOvernightSnapshot(req)
     };
     const handler = routes[reqUrl.pathname];
     if (!handler) {
@@ -1258,6 +1724,10 @@ async function routeStatic(reqUrl, res) {
 
 http.createServer((req, res) => {
   const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  if (req.method === "OPTIONS") {
+    send(res, 204, "", jsonHeaders);
+    return;
+  }
   if (reqUrl.pathname.startsWith("/api/")) {
     routeApi(req, reqUrl, res);
     return;

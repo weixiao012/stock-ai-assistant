@@ -1,0 +1,166 @@
+{
+  "snapshots": [
+    {
+      "date": "2026-07-01",
+      "targetDate": "2026-07-02",
+      "savedAt": "2026-07-01T06:35:00.000Z",
+      "status": "pending",
+      "modelVersion": "overnight-tail-v1",
+      "sampleType": "seed-preview",
+      "predictionWindow": {
+        "name": "tail-after-1430",
+        "label": "trading day after 14:30",
+        "seed": true
+      },
+      "settings": {
+        "changeRange": "3%-5%",
+        "hadLimitInMonth": true,
+        "maxMarketCap": 20000000000,
+        "minVolumeRatio": 1,
+        "turnoverRange": "5%-10%",
+        "requireAboveAverageLine": true
+      },
+      "predictions": [
+        {
+          "rank": 1,
+          "code": "002202",
+          "name": "金风科技",
+          "probability": 78,
+          "source": "seed-preview",
+          "reason": "gain 4.56% / limit sample / cap 180y / vr 1.92 / turn 6.20%",
+          "risk": "Seed sample for model calibration UI only.",
+          "changePct": 4.56,
+          "turnover": 6.2,
+          "volumeRatio": 1.92,
+          "amount": 2100000000,
+          "marketCap": 18000000000,
+          "floatMarketCap": 18000000000,
+          "lastLimitDate": "2026-06-20",
+          "aboveAverageStatus": "pending",
+          "aboveAverageRatio": 0,
+          "factors": [
+            "gain 4.56%",
+            "cap 180y",
+            "vr 1.92",
+            "turn 6.20%",
+            "avg pending"
+          ]
+        },
+        {
+          "rank": 2,
+          "code": "300666",
+          "name": "江丰电子",
+          "probability": 75,
+          "source": "seed-preview",
+          "reason": "gain 4.18% / limit sample / cap 128y / vr 1.66 / turn 7.40%",
+          "risk": "Seed sample for model calibration UI only.",
+          "changePct": 4.18,
+          "turnover": 7.4,
+          "volumeRatio": 1.66,
+          "amount": 1600000000,
+          "marketCap": 12800000000,
+          "floatMarketCap": 12800000000,
+          "lastLimitDate": "2026-06-18",
+          "aboveAverageStatus": "pending",
+          "aboveAverageRatio": 0,
+          "factors": [
+            "gain 4.18%",
+            "cap 128y",
+            "vr 1.66",
+            "turn 7.40%",
+            "avg pending"
+          ]
+        }
+      ],
+      "settleError": "No valid target-day kline data; keep pending instead of counting failures as misses.",
+      "lastTriedSettleAt": "2026-07-01T16:44:24.133Z"
+    },
+    {
+      "date": "2026-06-27",
+      "targetDate": "2026-06-30",
+      "savedAt": "2026-06-27T06:40:00.000Z",
+      "status": "settled",
+      "modelVersion": "overnight-tail-v1",
+      "sampleType": "seed-preview",
+      "predictionWindow": {
+        "name": "tail-after-1430",
+        "label": "trading day after 14:30",
+        "seed": true
+      },
+      "settings": {
+        "changeRange": "3%-5%",
+        "hadLimitInMonth": true,
+        "maxMarketCap": 20000000000,
+        "minVolumeRatio": 1,
+        "turnoverRange": "5%-10%",
+        "requireAboveAverageLine": true
+      },
+      "predictions": [
+        {
+          "rank": 1,
+          "code": "002167",
+          "name": "东方锆业",
+          "probability": 77,
+          "source": "seed-preview",
+          "reason": "gain 4.32% / limit sample / cap 62y / vr 1.82 / turn 7.10%",
+          "risk": "Seed sample for model calibration UI only.",
+          "changePct": 4.32,
+          "turnover": 7.1,
+          "volumeRatio": 1.82,
+          "amount": 1200000000,
+          "marketCap": 6200000000,
+          "floatMarketCap": 6200000000,
+          "lastLimitDate": "2026-06-10",
+          "aboveAverageStatus": "confirmed",
+          "aboveAverageRatio": 96.4,
+          "factors": [
+            "gain 4.32%",
+            "cap 62y",
+            "vr 1.82",
+            "turn 7.10%",
+            "avg 96.4%"
+          ]
+        }
+      ],
+      "results": [
+        {
+          "rank": 1,
+          "code": "002167",
+          "name": "东方锆业",
+          "probability": 77,
+          "hit": true,
+          "nextOpenPct": 1.12,
+          "nextHighPct": 3.86,
+          "nextClosePct": 1.44,
+          "maxDrawdownPct": -1.15,
+          "reason": "seed settled sample"
+        }
+      ],
+      "top5": {
+        "total": 1,
+        "hits": 1,
+        "rate": 100
+      },
+      "top10": {
+        "total": 1,
+        "hits": 1,
+        "rate": 100
+      },
+      "all": {
+        "total": 1,
+        "hits": 1,
+        "rate": 100
+      },
+      "hits": [
+        {
+          "rank": 1,
+          "code": "002167",
+          "name": "东方锆业",
+          "probability": 77,
+          "hit": true,
+          "nextHighPct": 3.86
+        }
+      ]
+    }
+  ]
+}

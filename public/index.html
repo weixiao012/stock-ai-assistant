@@ -8,38 +8,214 @@
   </head>
   <body>
     <div id="appShell" class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="brand-mark">AI</div>
+      <aside id="highOpenSidebar" class="market-sidebar prediction-sidebar" data-sidebar-panel="highOpen">
+        <div class="market-sidebar-head">
           <div>
-            <h1>A股智能分析助手</h1>
-            <p>涨停预测 · 操作计划 · 同花顺参考</p>
+            <p class="eyebrow">High Rush</p>
+            <h2>冲高5%边栏</h2>
           </div>
-          <button id="closeStockWorkspace" class="ghost-button sidebar-fold-button" type="button" title="收起个股工具/K线">收起</button>
         </div>
 
-        <form id="searchForm" class="search-box">
-          <label for="stockInput">股票代码</label>
-          <div class="search-row">
-            <input id="stockInput" name="stockInput" inputmode="numeric" maxlength="6" placeholder="例如 300059">
-            <button type="submit">分析</button>
-          </div>
-        </form>
-
-        <section class="panel watch-panel">
+        <article class="panel table-panel first-board-panel">
           <div class="panel-head">
-            <h2>自选</h2>
-            <button id="addWatch" class="ghost-button" type="button">加入</button>
+            <div>
+              <h2>冲高5%预测</h2>
+              <p class="panel-subtitle">尾盘30分钟给出保守候选，次日盘中最高价验证是否冲高 5% 以上</p>
+            </div>
+            <div class="panel-actions">
+              <button id="saveHighOpenSnapshot" class="ghost-button" type="button">记录尾盘预测</button>
+              <button id="refreshHighOpenHistory" class="ghost-button" type="button">准确度</button>
+              <button id="reloadFirstBoard" class="ghost-button" type="button">刷新</button>
+            </div>
           </div>
-          <div id="watchList" class="watch-list"></div>
-        </section>
+          <div class="rush-dashboard">
+            <div class="rush-control-card">
+              <div id="highOpenWindowStatus" class="window-status">尾盘预测窗口：交易日 14:30-15:00</div>
+              <div class="filter-bar high-open-filter">
+                <label>
+                  最低价
+                  <input id="highOpenMinPrice" type="number" min="0" step="0.01" placeholder="不限">
+                </label>
+                <label>
+                  最高价
+                  <input id="highOpenMaxPrice" type="number" min="0" step="0.01" placeholder="不限">
+                </label>
+                <button id="resetHighOpenFilter" class="ghost-button" type="button">重置价格</button>
+                <span id="highOpenFilterStatus">价格不限</span>
+              </div>
+              <div class="model-note">v5准确度优先：只保留前日强度适中、成交额达标、换手不过热、量比不过热、股性达标的少量候选；评分只排序，不等于真实胜率。</div>
+              <div id="highOpenTradeGate" class="strategy-gate">等待候选和历史样本同步。</div>
+            </div>
+            <div class="rush-insight-card">
+              <div id="highOpenAccuracy" class="accuracy-panel">
+                <div class="accuracy-card">
+                  <span>Top5命中</span>
+                  <strong>--</strong>
+                </div>
+                <div class="accuracy-card">
+                  <span>Top10命中</span>
+                  <strong>--</strong>
+                </div>
+                <div class="accuracy-card">
+                  <span>累计样本</span>
+                  <strong>--</strong>
+                </div>
+                <p id="highOpenAccuracyNote">记录预测后，会按次日盘中最高价自动结算是否冲高 5% 以上。</p>
+              </div>
+              <div id="highOpenHistoryBox" class="prediction-history-box">
+                <div class="history-toolbar">
+                  <span>预览历史数据</span>
+                  <button class="ghost-button history-zoom-button" type="button" data-history-zoom="highOpenHistoryBox">放大</button>
+                </div>
+                <div id="highOpenHistoryList" class="prediction-history-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap rush-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>股票</th>
+                  <th>模型评分</th>
+                  <th>预测条件</th>
+                  <th>关键因素</th>
+                  <th>风控</th>
+                </tr>
+              </thead>
+              <tbody id="firstBoardTable"></tbody>
+            </table>
+          </div>
+        </article>
 
-        <section class="panel compact">
-          <h2>指数温度</h2>
-          <div id="indexGrid" class="mini-grid"></div>
-        </section>
       </aside>
-      <button id="openStockWorkspaceRail" class="ghost-button stock-workspace-rail" type="button">个股/K线</button>
+
+      <aside id="overnightSidebar" class="market-sidebar prediction-sidebar is-closed" data-sidebar-panel="overnight">
+        <div class="market-sidebar-head">
+          <div>
+            <p class="eyebrow">Overnight</p>
+            <h2>一夜持股边栏</h2>
+          </div>
+        </div>
+
+        <article class="panel table-panel overnight-panel">
+          <div class="panel-head">
+            <div>
+              <h2>一夜持股票预测</h2>
+              <p class="panel-subtitle">尾盘隔夜候选：先记录样本，再用次日表现优化模型</p>
+            </div>
+            <div class="panel-actions">
+              <button id="saveOvernightSnapshot" class="ghost-button" type="button">记录预测</button>
+              <button id="refreshOvernightHistory" class="ghost-button" type="button">准确度</button>
+              <button id="reloadOvernight" class="ghost-button" type="button">刷新</button>
+            </div>
+          </div>
+          <div id="overnightAccuracy" class="accuracy-panel">
+            <div class="accuracy-card">
+              <span>Top5命中</span>
+              <strong>--</strong>
+            </div>
+            <div class="accuracy-card">
+              <span>平均高点</span>
+              <strong>--</strong>
+            </div>
+            <div class="accuracy-card">
+              <span>累计样本</span>
+              <strong>--</strong>
+            </div>
+            <p id="overnightAccuracyNote">记录后，按次日高点、收盘和最大回撤自动结算。</p>
+          </div>
+          <div id="overnightTradeGate" class="strategy-gate">等待候选和历史样本同步。</div>
+          <div id="overnightHistoryBox" class="prediction-history-box">
+            <div class="history-toolbar">
+              <span>一夜持历史样本</span>
+              <button class="ghost-button history-zoom-button" type="button" data-history-zoom="overnightHistoryBox">放大</button>
+            </div>
+            <div id="overnightHistoryList" class="prediction-history-list"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>股票</th>
+                  <th>评分</th>
+                  <th>硬条件</th>
+                  <th>增强因子</th>
+                  <th>风控</th>
+                </tr>
+              </thead>
+              <tbody id="overnightTable"></tbody>
+            </table>
+          </div>
+        </article>
+
+      </aside>
+
+      <aside id="limitSidebar" class="market-sidebar prediction-sidebar is-closed" data-sidebar-panel="limit">
+        <div class="market-sidebar-head">
+          <div>
+            <p class="eyebrow">Limit Up</p>
+            <h2>涨停预测边栏</h2>
+          </div>
+        </div>
+
+        <article class="panel table-panel limit-panel">
+          <div class="panel-head">
+            <div>
+              <h2>明日涨停预测榜</h2>
+              <p class="panel-subtitle">预测概率榜，不等于买入指令</p>
+            </div>
+            <div class="panel-actions">
+              <button id="savePredictionSnapshot" class="ghost-button" type="button">记录预测</button>
+              <button id="refreshPredictionHistory" class="ghost-button" type="button">准确度</button>
+              <button id="reloadLimit" class="ghost-button" type="button">刷新</button>
+            </div>
+          </div>
+          <div id="predictionAccuracy" class="accuracy-panel">
+            <div class="accuracy-card">
+              <span>Top5命中</span>
+              <strong>--</strong>
+            </div>
+            <div class="accuracy-card">
+              <span>Top10命中</span>
+              <strong>--</strong>
+            </div>
+            <div class="accuracy-card">
+              <span>累计样本</span>
+              <strong>--</strong>
+            </div>
+            <p id="predictionAccuracyNote">记录预测后，次日会按实际涨停池自动结算。</p>
+          </div>
+          <div id="limitTradeGate" class="strategy-gate">等待候选和历史样本同步。</div>
+          <div id="predictionHistoryBox" class="prediction-history-box">
+            <div class="history-toolbar">
+              <span>预测历史数据</span>
+              <button class="ghost-button history-zoom-button" type="button" data-history-zoom="predictionHistoryBox">放大</button>
+            </div>
+            <div id="predictionHistoryList" class="prediction-history-list"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>股票</th>
+                  <th>概率</th>
+                  <th>来源</th>
+                  <th>核心理由</th>
+                  <th>操作建议</th>
+                  <th>同花顺</th>
+                </tr>
+              </thead>
+              <tbody id="predictionTable"></tbody>
+            </table>
+          </div>
+        </article>
+
+      </aside>
+      <div class="market-sidebar-rails" aria-label="行情预测边栏入口">
+        <button class="ghost-button market-sidebar-rail" type="button" data-sidebar-open="highOpen">冲高5%</button>
+        <button class="ghost-button market-sidebar-rail" type="button" data-sidebar-open="overnight">一夜持股</button>
+        <button class="ghost-button market-sidebar-rail" type="button" data-sidebar-open="limit">涨停预测</button>
+      </div>
 
       <main class="workspace">
         <section class="topbar">
@@ -48,7 +224,6 @@
             <h2>明日短线雷达</h2>
           </div>
           <div class="actions">
-            <button id="toggleStockWorkspace" class="ghost-button" type="button">收起个股/K线</button>
             <button id="refreshAll" type="button">刷新行情</button>
             <span id="updatedAt" class="timestamp">等待数据</span>
           </div>
@@ -210,6 +385,29 @@
               </div>
               <button id="openEastmoney" class="ghost-button" type="button">东方财富</button>
             </div>
+            <div class="stock-workspace-tools">
+              <div class="stock-tool-card stock-search-card">
+                <div class="brand compact-brand">
+                  <div class="brand-mark">AI</div>
+                  <div>
+                    <h1>A股智能分析助手</h1>
+                    <p>个股分析 · K线数据 · 同花顺导入</p>
+                  </div>
+                </div>
+                <form id="searchForm" class="search-box">
+                  <label for="stockInput">股票代码</label>
+                  <div class="search-row">
+                    <input id="stockInput" name="stockInput" inputmode="numeric" maxlength="6" placeholder="例如 300059">
+                    <button type="submit">分析</button>
+                  </div>
+                </form>
+              </div>
+
+              <section class="stock-tool-card compact">
+                <h3>指数温度</h3>
+                <div id="indexGrid" class="mini-grid"></div>
+              </section>
+            </div>
             <div id="quoteMetrics" class="metric-grid"></div>
             <div class="kline-box">
               <div class="panel-head slim">
@@ -217,9 +415,12 @@
                 <div class="kline-period-tabs">
                   <button class="ghost-button active" type="button" data-kline-period="day">日K</button>
                   <button class="ghost-button" type="button" data-kline-period="week">周K</button>
+                  <button id="importThsKline" class="ghost-button" type="button">导入同花顺</button>
                   <button id="reloadKline" class="ghost-button" type="button">刷新K线</button>
                 </div>
               </div>
+              <input id="thsKlineFile" type="file" accept=".csv,.txt" hidden>
+              <div id="klineImportStatus" class="kline-import-status">行情源不可用时，可导入同花顺导出的 CSV/TXT K线数据。</div>
               <canvas id="klineCanvas" width="880" height="320"></canvas>
               <div class="table-wrap kline-table-wrap">
                 <table>
@@ -326,143 +527,6 @@
         </section>
 
         <section class="board-grid market-board">
-          <article class="panel table-panel first-board-panel">
-            <div class="panel-head">
-              <div>
-                <h2>冲高5%预测</h2>
-                <p class="panel-subtitle">尾盘30分钟给出保守候选，次日盘中最高价验证是否冲高 5% 以上</p>
-              </div>
-              <div class="panel-actions">
-                <button id="saveHighOpenSnapshot" class="ghost-button" type="button">记录尾盘预测</button>
-                <button id="refreshHighOpenHistory" class="ghost-button" type="button">准确度</button>
-                <button id="reloadFirstBoard" class="ghost-button" type="button">刷新</button>
-              </div>
-            </div>
-            <div class="rush-dashboard">
-              <div class="rush-control-card">
-                <div id="highOpenWindowStatus" class="window-status">尾盘预测窗口：交易日 14:30-15:00</div>
-                <div class="filter-bar high-open-filter">
-                  <label>
-                    最低价
-                    <input id="highOpenMinPrice" type="number" min="0" step="0.01" placeholder="不限">
-                  </label>
-                  <label>
-                    最高价
-                    <input id="highOpenMaxPrice" type="number" min="0" step="0.01" placeholder="不限">
-                  </label>
-                  <button id="resetHighOpenFilter" class="ghost-button" type="button">重置价格</button>
-                  <span id="highOpenFilterStatus">价格不限</span>
-                </div>
-                <div class="model-note">v5准确度优先：只保留前日强度适中、成交额达标、换手不过热、量比不过热、股性达标的少量候选；评分只排序，不等于真实胜率。</div>
-                <div id="highOpenTradeGate" class="strategy-gate">等待候选和历史样本同步。</div>
-              </div>
-              <div class="rush-insight-card">
-                <div id="highOpenAccuracy" class="accuracy-panel">
-                  <div class="accuracy-card">
-                    <span>Top5命中</span>
-                    <strong>--</strong>
-                  </div>
-                  <div class="accuracy-card">
-                    <span>Top10命中</span>
-                    <strong>--</strong>
-                  </div>
-                  <div class="accuracy-card">
-                    <span>累计样本</span>
-                    <strong>--</strong>
-                  </div>
-                  <p id="highOpenAccuracyNote">记录预测后，会按次日盘中最高价自动结算是否冲高 5% 以上。</p>
-                </div>
-                <div id="highOpenHistoryBox" class="prediction-history-box">
-                  <div class="history-toolbar">
-                    <span>预览历史数据</span>
-                    <button class="ghost-button history-zoom-button" type="button" data-history-zoom="highOpenHistoryBox">放大</button>
-                  </div>
-                  <div id="highOpenHistoryList" class="prediction-history-list"></div>
-                </div>
-              </div>
-            </div>
-            <div class="table-wrap rush-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>股票</th>
-                    <th>模型评分</th>
-                    <th>预测条件</th>
-                    <th>关键因素</th>
-                    <th>风控</th>
-                  </tr>
-                </thead>
-                <tbody id="firstBoardTable"></tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="panel table-panel limit-panel">
-            <div class="panel-head">
-              <div>
-                <h2>明日涨停预测榜</h2>
-                <p class="panel-subtitle">预测概率榜，不等于买入指令</p>
-              </div>
-              <div class="panel-actions">
-                <button id="savePredictionSnapshot" class="ghost-button" type="button">记录预测</button>
-                <button id="refreshPredictionHistory" class="ghost-button" type="button">准确度</button>
-                <button id="reloadLimit" class="ghost-button" type="button">刷新</button>
-              </div>
-            </div>
-            <div id="predictionAccuracy" class="accuracy-panel">
-              <div class="accuracy-card">
-                <span>Top5命中</span>
-                <strong>--</strong>
-              </div>
-              <div class="accuracy-card">
-                <span>Top10命中</span>
-                <strong>--</strong>
-              </div>
-              <div class="accuracy-card">
-                <span>累计样本</span>
-                <strong>--</strong>
-              </div>
-              <p id="predictionAccuracyNote">记录预测后，次日会按实际涨停池自动结算。</p>
-            </div>
-            <div id="limitTradeGate" class="strategy-gate">等待候选和历史样本同步。</div>
-            <div id="predictionHistoryBox" class="prediction-history-box">
-              <div class="history-toolbar">
-                <span>预测历史数据</span>
-                <button class="ghost-button history-zoom-button" type="button" data-history-zoom="predictionHistoryBox">放大</button>
-              </div>
-              <div id="predictionHistoryList" class="prediction-history-list"></div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>股票</th>
-                    <th>概率</th>
-                    <th>来源</th>
-                    <th>核心理由</th>
-                    <th>操作建议</th>
-                    <th>同花顺</th>
-                  </tr>
-                </thead>
-                <tbody id="predictionTable"></tbody>
-              </table>
-            </div>
-          </article>
-
-          <article id="sectorPanel" class="panel table-panel sector-panel">
-            <div class="panel-head">
-              <div>
-                <h2>强势板块</h2>
-                <p id="sectorSummary" class="panel-subtitle">等待板块数据</p>
-              </div>
-              <div class="panel-actions">
-                <button id="toggleSector" class="ghost-button" type="button">概念</button>
-                <button id="toggleSectorPanel" class="ghost-button" type="button">收起</button>
-              </div>
-            </div>
-            <div id="sectorList" class="sector-list"></div>
-          </article>
-
           <article class="panel table-panel flow-panel">
             <div class="panel-head">
               <div>
@@ -491,6 +555,6 @@
       </main>
     </div>
 
-    <script src="./app.js" type="module"></script>
+    <script src="./app.js" defer></script>
   </body>
 </html>
